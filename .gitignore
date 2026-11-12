@@ -1,0 +1,29 @@
+# Dependencies and build output (all packages)
+node_modules/
+dist/
+coverage/
+# Secrets; only examples belong in Git
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+# Database backups; keep schema.sql and migrations/*.sql tracked
+backups/
+backup/
+*.dump
+*.dump.*
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*backup*.sql
+*dump*.sql
+payday_db*.sql
+# Local files
+.DS_Store
+*.log
+.openai/

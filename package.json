@@ -1,0 +1,22 @@
+{
+  "name": "payday-payroll",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.7.0 <27"
+  },
+  "scripts": {
+    "build": "npm ci --prefix server && npm ci --prefix frontend --include=dev && npm run build --prefix frontend",
+    "start": "npm --prefix server start",
+    "dev:server": "npm --prefix server run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm --prefix server test",
+    "db:init": "npm --prefix server run db:init",
+    "migrate": "npm --prefix server run migrate",
+    "create-admin": "npm --prefix server run create-admin --",
+    "test:browser": "npm --prefix server run test:browser",
+    "check:git": "node scripts/check-git-files.mjs"
+  }
+}
