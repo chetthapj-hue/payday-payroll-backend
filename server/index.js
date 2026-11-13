@@ -310,6 +310,7 @@ app.get('/api/work-logs', requireAdmin, async (req, res) => {
                 e.full_name,
                 w.work_date::text AS work_date,
                 w.shift_type,
+                w.wage_multiplier,
                 w.regular_minutes,
                 w.overtime_minutes,
                 w.overtime_3x_minutes,

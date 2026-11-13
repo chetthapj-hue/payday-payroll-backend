@@ -68,5 +68,21 @@ export function workTimePayload(form) {
     const overtime_3x_minutes = hoursToMinutes(form.overtime_3x_hours);
     if (Number(form.overtime_3x_hours) > Number(form.overtime_hours)) throw new Error('OT 3 เท่าต้องไม่เกิน OT รวม');
     if (Number(form.overtime_hours) > 16) throw new Error('เวลาปกติและ OT รวมต้องไม่เกิน 24 ชม. ต่อวัน');
-    return { work_date: form.work_date, regular_minutes: 480, overtime_minutes, overtime_3x_minutes, shift_type: form.shift_type };
+    return { wage_multiplier: isWeekend(form.work_date) ? Number(form.wage_multiplier ?? 1) : 1, work_date: form.work_date, regular_minutes: 480, overtime_minutes, overtime_3x_minutes, shift_type: form.shift_type };
+}
+
+// Date inputs are Thai calendar dates; use UTC only to read their weekday without host timezone shifts.
+export const isWeekend = date => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+export const payrollMetrics = [
+    ['recorded_days', 'จำนวนวันทำงาน', 'days'],
+    ['overtime_total_minutes', 'ชั่วโมง OT รวม', 'hours'],
+    ['overtime_15_minutes', 'ชั่วโมง OT 1.5 เท่า', 'hours'],
+    ['overtime_3_minutes', 'ชั่วโมง OT 3 เท่า', 'hours'],
+    ['overtime_total_pay', 'เงิน OT รวม', 'money'],
+];
+export function metricValue(value, type) {
+    if (value == null) return 'ไม่มีข้อมูลในรายงานเดิม';
+    if (type === 'hours') return workHours(value);
+    if (type === 'days') return `${value} วัน`;
+    return `${money(value)} บาท`;
 }

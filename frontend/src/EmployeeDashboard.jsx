@@ -1,3 +1,4 @@
+import PayrollMetrics from './PayrollMetrics';
 import { useEffect, useState } from 'react';
 import { api, currentMonth, money, thaiDate, workHours, bangkokToday, payMonthForWorkDate } from './api';
 import EmployeeWorkForm from './EmployeeWorkForm';
@@ -46,9 +47,9 @@ export default function EmployeeDashboard({ user }) {
         {(tab === 'log' || tab === 'accrued') && <AccruedIncome key={`${accruedMonth}:${revision}`} month={accruedMonth} onMonthChange={setAccruedMonth} />}
         {tab === 'work' && <section className="space-y-4">
             <label className="block max-w-xs">เดือนที่ทำงาน<input required type="month" min="2000-01" max="2199-12" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); setLoading(true); setError(''); setLogs([]); } }} /></label>
-            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'กะ', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
-                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td></tr>)}
-                {!logs.length && <tr><td colSpan="6">ไม่มีประวัติในเดือนที่เลือก</td></tr>}
+            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'กะ', 'ค่าแรงที่เลือก', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
+                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td></tr>)}
+                {!logs.length && <tr><td colSpan="7">ไม่มีประวัติในเดือนที่เลือก</td></tr>}
             </tbody></table></div>}
         </section>}
         {tab === 'payroll' && <section className="space-y-4">
@@ -63,6 +64,7 @@ export default function EmployeeDashboard({ user }) {
                     <p>ค่าจ้างปกติ / ค่าอาหาร / ค่ากะ: {thaiDate(selected.start_date)} ถึง {thaiDate(selected.end_date)}</p>
                     <p>OT: {thaiDate(selected.overtime_start_date)} ถึง {thaiDate(selected.overtime_end_date)}</p>
                 </div>
+                <PayrollMetrics row={selected} />
                 <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {[['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']].map(([key, label]) => <div key={key} className="rounded-2xl border border-slate-200 bg-white p-6"><dt className="text-slate-600">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{money(selected[key])} บาท</dd></div>)}
                 </dl>

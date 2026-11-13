@@ -25,7 +25,7 @@ async function login(login,password,role='employee') {
 }
 before(async()=>{
  assert.equal((await pool.query('SELECT current_database() AS n')).rows[0].n,name);
- for(const f of ['001_saved_reports.sql','002_auth.sql','003_employee_status.sql'])await pool.query(await readFile(new URL(`../migrations/${f}`,import.meta.url),'utf8'));
+ for(const f of ['001_saved_reports.sql','002_auth.sql','003_employee_status.sql','004_weekend_payroll_metrics.sql'])await pool.query(await readFile(new URL(`../migrations/${f}`,import.meta.url),'utf8'));
  server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base=`http://127.0.0.1:${server.address().port}/api`;
 });
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();});
@@ -39,9 +39,9 @@ beforeEach(async()=>{
 async function account(e){return request(`/employees/${e.id}/account`,{temporary_password:temp},admin);}
 async function ready(e){await account(e);const s=await login(e.employee_code,temp);return request('/auth/password',{current_password:temp,new_password:permanent},s).then(r=>({...r,csrf:r.data?.csrf_token}));}
 async function save(){
- for(const e of [a,b])await request('/work-logs',{employee_id:e.id,work_date:'2026-10-17',regular_minutes:480,overtime_minutes:60,overtime_3x_minutes:30,shift_type:'night'},admin);
- const preview=(await request('/payroll/preview?month=2026-11',undefined,admin)).data;
- return (await request('/payroll/save',{month:'2026-11',preview_token:preview.preview_token},admin)).data;
+ for(const e of [a,b])await request('/work-logs',{employee_id:e.id,work_date:'2025-10-17',regular_minutes:480,overtime_minutes:60,overtime_3x_minutes:30,shift_type:'night'},admin);
+ const preview=(await request('/payroll/preview?month=2025-11',undefined,admin)).data;
+ return (await request('/payroll/save',{month:'2025-11',preview_token:preview.preview_token},admin)).data;
 }
 
 test('passwords are salted scrypt hashes; first admin has no default and cannot be bootstrapped twice',async()=>{
@@ -55,7 +55,7 @@ test('passwords are salted scrypt hashes; first admin has no default and cannot 
 });
 test('every management endpoint denies anonymous and employee callers, including direct writes',async()=>{
  const s=await ready(a);
- const endpoints=[[`/employees/${b.id}/deletion-check`],[`/employees/${b.id}`,{},'DELETE'],[`/employees/${b.id}/deactivate`,{}],['/employees'],[`/employees/${b.id}`],['/work-logs'],['/payroll/preview?month=2026-11'],['/payroll/periods'],['/payroll/periods/1'],['/accounts'],['/health/db'],
+ const endpoints=[[`/employees/${b.id}/deletion-check`],[`/employees/${b.id}`,{},'DELETE'],[`/employees/${b.id}/deactivate`,{}],['/employees'],[`/employees/${b.id}`],['/work-logs'],['/payroll/preview?month=2025-11'],['/payroll/periods'],['/payroll/periods/1'],['/accounts'],['/health/db'],
  ['/employees',{}],[`/employees/${b.id}`,{},'PUT'],['/work-logs',{}],['/payroll/save',{}],['/payroll/periods/1/publish',{}],
  [`/employees/${b.id}/account`,{}],[`/employees/${b.id}/reset-password`,{}],[`/employees/${b.id}/disable-account`,{}]];
  for(const [path,body,method] of endpoints){
@@ -66,7 +66,7 @@ test('every management endpoint denies anonymous and employee callers, including
 test('temporary password gates every data API and change rotates session; expired and tampered sessions fail',async()=>{
  await account(a);const s=await login('A',temp);assert.equal(s.data.user.must_change_password,true);
  assert.match(s.setCookie,/HttpOnly/);assert.match(s.setCookie,/SameSite=Lax/);assert.doesNotMatch(s.setCookie,/; Secure/);
- for(const path of ['/me/work-logs?month=2026-10','/me/payroll','/me/payroll/1','/employees']){
+ for(const path of ['/me/work-logs?month=2025-10','/me/payroll','/me/payroll/1','/employees']){
   const r=await request(path,undefined,s);assert.equal(r.status,403);assert.equal(r.code,'PASSWORD_CHANGE_REQUIRED');
  }
  assert.equal((await request('/auth/password',{current_password:'wrong',new_password:permanent},s)).status,400);
@@ -84,9 +84,9 @@ test('employee ownership comes from session even if IDs are forged; unpublished 
  const sa=await ready(a),sb=await ready(b);const saved=await save();const id=saved.period.id;
  assert.deepEqual((await request('/me/payroll',undefined,sa)).data,[]);
  assert.equal((await request(`/me/payroll/${id}`,undefined,sa)).status,404);
- const logs=(await request(`/me/work-logs?month=2026-10&employee_id=${b.id}`,undefined,sa)).data;
+ const logs=(await request(`/me/work-logs?month=2025-10&employee_id=${b.id}`,undefined,sa)).data;
  assert.equal(logs.length,1);assert.equal(logs[0].employee_id,a.id);
- assert.deepEqual((await request('/me/work-logs?month=2026-11',undefined,sa)).data,[]);
+ assert.deepEqual((await request('/me/work-logs?month=2025-11',undefined,sa)).data,[]);
  const published=await request(`/payroll/periods/${id}/publish`,{},admin);assert.equal(published.status,200);
  const repeat=await request(`/payroll/periods/${id}/publish`,{},admin);
  assert.equal(repeat.data.period.published_at,published.data.period.published_at);
@@ -98,7 +98,7 @@ test('employee ownership comes from session even if IDs are forged; unpublished 
  }
  // A period containing only B must not disclose its metadata or amounts to A.
  const other=(await pool.query(`INSERT INTO payroll_periods(period_name,start_date,end_date,payment_date,saved_at,published_at)
-  VALUES('B only','2026-11-17','2026-12-16','2026-12-25',now(),now()) RETURNING id`)).rows[0];
+  VALUES('B only','2025-11-17','2025-12-16','2025-12-25',now(),now()) RETURNING id`)).rows[0];
  await pool.query(`INSERT INTO payroll_items(payroll_period_id,employee_id,employee_code_snapshot,full_name_snapshot,
   pay_type_used,pay_rate_used,base_pay,overtime_15_pay,overtime_3_pay,meal_pay,shift_pay)
   VALUES($1,$2,'B','ชื่อ B','daily',1000,1000,0,0,0,0)`,[other.id,b.id]);
@@ -138,7 +138,7 @@ test('CSRF, secure cookie on HTTPS, duplicate account, invalid month, no hash/to
  const r=await fetch(`${base}/employees`,{method:'POST',headers:{'Content-Type':'application/json',Cookie:admin.cookie},body:'{}'});
  assert.equal(r.status,403);
  const forged={...admin,csrf:'forged'};assert.equal((await request('/payroll/save',{},forged)).code,'CSRF_REJECTED');
- const s=await ready(b);assert.equal((await request('/me/work-logs?month=2026-13',undefined,s)).status,400);
+ const s=await ready(b);assert.equal((await request('/me/work-logs?month=2025-13',undefined,s)).status,400);
  app.set('trust proxy',1);
  try {
   const r=await fetch(`${base}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json','X-PayDay-Request':'1','X-Forwarded-Proto':'https'},body:JSON.stringify({role:'admin',login:'test-admin',password})});
@@ -163,7 +163,7 @@ test('forged account ID cannot change another employee password; only saved peri
  assert.equal(r.status,200);assert.equal(r.data.user.employee_id,a.id);
  assert.equal((await login('B',permanent)).status,200);
  assert.equal((await login('A',permanent)).status,401);
- const p=(await pool.query("INSERT INTO payroll_periods(period_name,start_date,end_date) VALUES('draft','2026-10-17','2026-11-16') RETURNING id")).rows[0];
+ const p=(await pool.query("INSERT INTO payroll_periods(period_name,start_date,end_date) VALUES('draft','2025-10-17','2025-11-16') RETURNING id")).rows[0];
  assert.equal((await request(`/payroll/periods/${p.id}/publish`,{},admin)).status,404);
  assert.equal((await pool.query('SELECT published_at FROM payroll_periods WHERE id=$1',[p.id])).rows[0].published_at,null);
 });
@@ -202,7 +202,7 @@ test('admin permanently deletes only employees with no account, work or payroll 
  assert.equal((await request(`/employees/${a.id}`,undefined,admin)).status,200);
 });
 test('work-only and payroll-only references independently prevent deletion',async()=>{
- await request('/work-logs',{employee_id:a.id,work_date:'2026-10-17',regular_minutes:480,overtime_minutes:0,overtime_3x_minutes:0,shift_type:'day'},admin);
+ await request('/work-logs',{employee_id:a.id,work_date:'2025-10-17',regular_minutes:480,overtime_minutes:0,overtime_3x_minutes:0,shift_type:'day'},admin);
  assert.equal((await request(`/employees/${a.id}`,{},admin,'DELETE')).status,409);
  await save(); // B now has a saved item; remove its test work to isolate the payroll FK.
  await pool.query('DELETE FROM work_logs WHERE employee_id=$1',[b.id]);
@@ -219,15 +219,15 @@ test('deactivation revokes sessions, blocks new work/account reset and preserves
  assert.equal((await request('/auth/session',undefined,second)).status,401);
  assert.equal((await login('A',permanent)).status,401);
  assert.equal((await request(`/employees/${a.id}/reset-password`,{temporary_password:temp},admin)).status,409);
- const work=await request('/work-logs',{employee_id:a.id,work_date:'2026-11-01',regular_minutes:480,overtime_minutes:60,overtime_3x_minutes:0,shift_type:'day'},admin);
+ const work=await request('/work-logs',{employee_id:a.id,work_date:'2025-11-01',regular_minutes:480,overtime_minutes:60,overtime_3x_minutes:0,shift_type:'day'},admin);
  assert.equal(work.status,409);
- const history=await request(`/work-logs?employee_id=${a.id}&month=2026-10`,undefined,admin);
+ const history=await request(`/work-logs?employee_id=${a.id}&month=2025-10`,undefined,admin);
  assert.equal(history.status,200);assert.equal(history.data.length,1);assert.equal(history.data[0].employee_id,a.id);
  assert.deepEqual((await request(`/payroll/periods/${saved.period.id}`,undefined,admin)).data,before);
  assert.equal((await request('/employees',undefined,admin)).data.find(e=>e.id===a.id).is_active,false);
  for(let i=0;i<2;i++)await pool.query(await readFile(new URL('../migrations/003_employee_status.sql',import.meta.url),'utf8'));
  assert.equal((await request(`/employees/${a.id}`,undefined,admin)).data.is_active,false);
- assert.equal((await request('/work-logs?month=2026-13',undefined,admin)).status,400);
+ assert.equal((await request('/work-logs?month=2025-13',undefined,admin)).status,400);
  assert.equal((await request('/work-logs?employee_id=bad',undefined,admin)).status,400);
  await request(`/employees/${b.id}/deactivate`,{},admin);
  assert.equal((await request(`/employees/${b.id}/account`,{temporary_password:temp},admin)).status,409);
@@ -236,13 +236,13 @@ test('deactivation revokes sessions, blocks new work/account reset and preserves
 const fullDay=(date,extra={})=>({work_date:date,regular_minutes:480,overtime_minutes:0,overtime_3x_minutes:0,shift_type:'day',...extra});
 const offsetDate=(date,days)=>new Date(new Date(`${date}T00:00:00Z`).getTime()+days*86400000).toISOString().slice(0,10);
 test('Bangkok date boundary is independent of host timezone',()=>{
- assert.equal(bangkokToday(new Date('2026-11-11T16:59:59.999Z')),'2026-11-11');
- assert.equal(bangkokToday(new Date('2026-11-11T17:00:00.000Z')),'2026-11-12');
+ assert.equal(bangkokToday(new Date('2025-11-11T16:59:59.999Z')),'2025-11-11');
+ assert.equal(bangkokToday(new Date('2025-11-11T17:00:00.000Z')),'2025-11-12');
 });
 test('employee self logging accepts today/past, rejects future and forged owner, validates OT and gates temporary passwords',async()=>{
  await account(a);const temporary=await login('A',temp);
  assert.equal((await request('/me/work-logs',fullDay(bangkokToday()),temporary)).status,403);
- assert.equal((await request('/me/accrued-income?month=2026-12',undefined,temporary)).status,403);
+ assert.equal((await request('/me/accrued-income?month=2025-12',undefined,temporary)).status,403);
  const change=await request('/auth/password',{current_password:temp,new_password:permanent},temporary);
  const s={cookie:change.cookie,csrf:change.data.csrf_token};
  const today=bangkokToday(),yesterday=offsetDate(today,-1),tomorrow=offsetDate(today,1);
@@ -267,39 +267,39 @@ test('accrued income: five 500-baht days plus prior-month OT 600 = 3100 before a
  await request(`/employees/${a.id}`,{employee_code:'A',full_name:'ชื่อ A',pay_type:'daily',pay_rate:'500.00'},admin,'PUT');
  const s=await ready(a);
  const write=async(date,extra={})=>assert.equal((await request('/work-logs',{...fullDay(date,extra),employee_id:a.id},admin)).status,201);
- for(const date of ['2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21'])await write(date);
- await write('2026-11-01',{overtime_minutes:384});
- const data=(await request(`/me/accrued-income?month=2026-12&employee_id=${b.id}`,undefined,s)).data;
+ for(const date of ['2025-11-17','2025-11-18','2025-11-19','2025-11-20','2025-11-21'])await write(date);
+ await write('2025-11-01',{overtime_minutes:384});
+ const data=(await request(`/me/accrued-income?month=2025-12&employee_id=${b.id}`,undefined,s)).data;
  assert.equal(data.row.employee_id,a.id);assert.equal(data.row.recorded_days,5);
  assert.equal(data.row.base_pay,'2500.00');assert.equal(data.row.overtime_15_pay,'600.00');
  assert.equal(Number(data.row.base_pay)+Number(data.row.overtime_15_pay),3100);
  assert.equal(data.row.meal_pay,'415.00');assert.equal(data.row.gross_pay,'3515.00');
- const p=data.period;assert.deepEqual([p.start_date,p.end_date,p.overtime_start_date,p.overtime_end_date,p.payment_date],['2026-11-17','2026-12-16','2026-11-01','2026-11-30','2026-12-25']);
- const adminRow=(await request('/payroll/preview?month=2026-12',undefined,admin)).data.rows.find(r=>r.employee_id===a.id);
+ const p=data.period;assert.deepEqual([p.start_date,p.end_date,p.overtime_start_date,p.overtime_end_date,p.payment_date],['2025-11-17','2025-12-16','2025-11-01','2025-11-30','2025-12-25']);
+ const adminRow=(await request('/payroll/preview?month=2025-12',undefined,admin)).data.rows.find(r=>r.employee_id===a.id);
  assert.deepEqual(data.row,adminRow);
  assert.equal((await request('/me/accrued-income?month=bad',undefined,s)).status,400);
- assert.equal((await request('/me/accrued-income?month=2026-12')).status,401);
+ assert.equal((await request('/me/accrued-income?month=2025-12')).status,401);
 });
 test('wage day 16/17 and OT month end/day 1 belong to distinct periods including January rollover',async()=>{
  const s=await ready(a);
- for(const date of ['2026-11-16','2026-11-17','2026-11-30','2026-12-01','2026-12-16','2026-12-17'])
+ for(const date of ['2025-11-16','2025-11-17','2025-11-30','2025-12-01','2025-12-16','2025-12-17'])
   assert.equal((await request('/work-logs',{employee_id:a.id,...fullDay(date,{overtime_minutes:60,overtime_3x_minutes:30})},admin)).status,201);
  const get=async month=>(await request(`/me/accrued-income?month=${month}`,undefined,s)).data;
- const november=await get('2026-11'),december=await get('2026-12'),january=await get('2027-01');
+ const november=await get('2025-11'),december=await get('2025-12'),january=await get('2026-01');
  assert.equal(november.row.recorded_days,1);assert.equal(november.row.base_pay,'800.00');assert.equal(november.row.overtime_3_pay,'0.00');
  assert.equal(december.row.recorded_days,4);assert.equal(december.row.base_pay,'3200.00');
  assert.equal(december.row.overtime_15_pay,'225.00');assert.equal(december.row.overtime_3_pay,'450.00');
  assert.equal(january.row.recorded_days,1);assert.equal(january.row.base_pay,'800.00');
  assert.equal(january.row.overtime_15_pay,'225.00');assert.equal(january.row.overtime_3_pay,'450.00');
- assert.equal(january.period.overtime_start_date,'2026-12-01');assert.equal(january.period.payment_date,'2027-01-25');
+ assert.equal(january.period.overtime_start_date,'2025-12-01');assert.equal(january.period.payment_date,'2026-01-25');
 });
 test('self logging updates live accrual while published payroll remains frozen',async()=>{
  const s=await ready(a);const saved=await save();
  await request(`/payroll/periods/${saved.period.id}/publish`,{},admin);
  const old=(await request(`/me/payroll/${saved.period.id}`,undefined,s)).data;
- const before=(await request('/me/accrued-income?month=2026-11',undefined,s)).data.row;
- assert.equal((await request('/me/work-logs',fullDay('2026-10-18'),s)).status,201);
- const after=(await request('/me/accrued-income?month=2026-11',undefined,s)).data.row;
+ const before=(await request('/me/accrued-income?month=2025-11',undefined,s)).data.row;
+ assert.equal((await request('/me/work-logs',fullDay('2025-10-18'),s)).status,201);
+ const after=(await request('/me/accrued-income?month=2025-11',undefined,s)).data.row;
  assert.equal(after.recorded_days,before.recorded_days+1);
  assert.equal(Number(after.base_pay),Number(before.base_pay)+800);
  assert.equal(Number(after.meal_pay),Number(before.meal_pay)+83);
@@ -308,9 +308,9 @@ test('self logging updates live accrual while published payroll remains frozen',
 test('monthly accrual keeps full monthly rate; another employee invalid work cannot leak or block own income',async()=>{
  await request(`/employees/${a.id}`,{employee_code:'A',full_name:'ชื่อ A',pay_type:'monthly',pay_rate:'24000.00'},admin,'PUT');
  const s=await ready(a);
- await request('/work-logs',{employee_id:b.id,...fullDay('2026-11-17')},admin);
+ await request('/work-logs',{employee_id:b.id,...fullDay('2025-11-17')},admin);
  await pool.query('UPDATE work_logs SET regular_minutes=240 WHERE employee_id=$1',[b.id]);
- const data=(await request('/me/accrued-income?month=2026-12',undefined,s)).data;
+ const data=(await request('/me/accrued-income?month=2025-12',undefined,s)).data;
  assert.equal(data.row.recorded_days,0);assert.equal(data.row.base_pay,'24000.00');assert.equal(data.row.employee_id,a.id);
 });
 
@@ -324,4 +324,27 @@ test('unknown API GET/POST are JSON 404 for anonymous, admin and employee; known
  const bare=await fetch(`${base}/does-not-exist`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(bare.status,404);
  assert.equal((await request('/employees')).status,401);
  assert.equal((await request('/employees',undefined,employee)).status,403);
+});
+
+test('employee weekend multiplier and OT metrics match admin and published snapshots remain private',async()=>{
+ const s=await ready(a), other=await ready(b);
+ const body={work_date:'2025-10-18',regular_minutes:480,overtime_minutes:120,overtime_3x_minutes:30,shift_type:'day',wage_multiplier:2};
+ assert.equal((await request('/me/work-logs',{...body,employee_id:b.id},s)).status,201);
+ assert.equal((await request('/me/work-logs',{...body,work_date:'2025-10-20'},s)).status,400);
+ const own=(await request('/me/work-logs?month=2025-10',undefined,s)).data;
+ assert.equal(own.length,1); assert.equal(own[0].employee_id,a.id); assert.equal(own[0].wage_multiplier,2);
+ const accrued=(await request(`/me/accrued-income?month=2025-11&employee_id=${b.id}`,undefined,s)).data.row;
+ const preview=(await request('/payroll/preview?month=2025-11',undefined,admin)).data;
+ assert.deepEqual(accrued,preview.rows.find(r=>r.employee_id===a.id));
+ assert.equal(accrued.recorded_days,1); assert.equal(accrued.overtime_total_minutes,120);
+ assert.equal(accrued.overtime_15_minutes,90); assert.equal(accrued.overtime_3_minutes,30);
+ const saved=(await request('/payroll/save',{month:'2025-11',preview_token:preview.preview_token},admin)).data;
+ await request(`/payroll/periods/${saved.period.id}/publish`,{},admin);
+ const published=(await request('/me/payroll',undefined,s)).data[0];
+ for(const key of ['recorded_days','overtime_15_minutes','overtime_3_minutes','overtime_total_minutes','overtime_total_pay'])assert.equal(published[key],accrued[key]);
+ await pool.query('UPDATE work_logs SET overtime_minutes=30,wage_multiplier=1 WHERE employee_id=$1',[a.id]);
+ assert.deepEqual((await request('/me/payroll',undefined,s)).data[0],published);
+ const others=(await request('/me/payroll',undefined,other)).data;
+ assert.ok(others.every(r=>r.employee_id===b.id));
+ assert.equal((await request(`/me/payroll/${saved.period.id}?employee_id=${a.id}`,undefined,other)).data.employee_id,b.id);
 });

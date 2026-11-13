@@ -74,3 +74,27 @@ npm run dev -- --host 127.0.0.1
 Chrome ผ่าน runner เดิม `tests/run-browser-tests.js` เพิ่มชุด `self-service-browser.mjs` เป็นชุดที่สี่ ทดสอบลงวันนี้/ย้อนหลังผ่านฟอร์มจริง ตรวจ payload ชั่วโมง→นาที, max date/future API, ยอดอัปเดตโดยไม่ reload, ตัวอย่าง 2,500+600 และเปิด snapshot เดิม ภาพตัวอย่าง `/tmp/payday-browser/self-service.png` เป็นข้อมูลจำลองทั้งหมด
 
 Fixtures งวดธันวาคมในชุดทดสอบลงด้วย API Admin ในฐานทดสอบเท่านั้น เพราะช่วงตัวอย่างอาจยังอยู่ในอนาคต ณ วันรันทดสอบ ไม่มีการผ่อนเงื่อนไขวันอนาคตของ API พนักงาน
+
+### Weekend wages and payroll metrics (migration 004)
+
+Run `npm run migrate` from the repository root in the Render service shell before
+starting the updated application. This applies the repeatable migrations, including
+`004_weekend_payroll_metrics.sql`. Do not run `db:init` on an existing database.
+
+Work log `wage_multiplier` defaults to 1 for existing/new records. Only Saturday
+and Sunday (the submitted Thai calendar date) accept 2; the API and database both
+reject weekday double wages. The multiplier changes daily regular pay only.
+Monthly base pay and the existing OT, meal and shift rules remain unchanged.
+Both Admin and employee submissions reject dates after today in Asia/Bangkok.
+
+`calculate` in payroll.js is shared by Admin previews and employee accruals.
+Distinct work dates from the previous month's 17th through payment month's 16th
+count once, including double-wage days. OT uses the previous calendar month;
+OT 3x is a subset of total OT, with the remainder paid at 1.5x. Hours are stored
+as minutes and displayed as hours. Total OT pay sums the rounded components.
+
+New saved periods snapshot recorded days, OT minutes by category and total, and
+total OT pay. Published reports read these snapshots, never current work logs.
+Legacy reports retain NULL day/hour metrics and display “ไม่มีข้อมูลในรายงานเดิม”.
+Legacy total OT pay sums the two existing saved monetary components.
+Employee reports remain scoped to the employee ID from their authenticated session.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, money, thaiDate } from './api';
+import { api, money, thaiDate, payrollMetrics, metricValue } from './api';
 
 const columns = [['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']];
 export default function Payroll({ reportsOnly }) {
@@ -68,10 +68,10 @@ export default function Payroll({ reportsOnly }) {
                 <p>OT: {thaiDate(data.period.overtime_start_date)} ถึง {thaiDate(data.period.overtime_end_date)}</p>
                 <p className="text-sm">รวมวันต้นและวันท้าย ค่าอาหารรวมส่วนเพิ่ม OT ที่บันทึกแล้ว จึงไม่บวก 83 บาทซ้ำ</p>
             </div>
-            <div className="table-wrap"><table><thead><tr><th>รหัส</th><th>ชื่อพนักงาน</th><th>ประเภท / อัตรา</th>{columns.map(([key, title]) => <th key={key}>{title}</th>)}</tr></thead><tbody>
-                {data.rows.map(row => <tr key={row.employee_id}><td>{row.employee_code}</td><td>{row.full_name}</td><td>{row.pay_type_used === 'daily' ? 'รายวัน' : 'รายเดือน'} / {money(row.pay_rate_used)}</td>{columns.map(([key]) => <td className="text-right tabular-nums" key={key}>{money(row[key])}</td>)}</tr>)}
-                {!data.rows.length && <tr><td colSpan="9">ไม่มีพนักงานในงวดนี้</td></tr>}
-            </tbody><tfoot><tr><th colSpan="3">รวม (บาท)</th>{columns.map(([key]) => <td className="text-right font-semibold tabular-nums" key={key}>{money(data.rows.reduce((sum, row) => sum + Number(row[key]), 0))}</td>)}</tr></tfoot></table></div>
+            <div className="table-wrap"><table><thead><tr><th>รหัส</th><th>ชื่อพนักงาน</th><th>ประเภท / อัตรา</th>{payrollMetrics.map(([key, title]) => <th key={key}>{title}</th>)}{columns.map(([key, title]) => <th key={key}>{title}</th>)}</tr></thead><tbody>
+                {data.rows.map(row => <tr key={row.employee_id}><td>{row.employee_code}</td><td>{row.full_name}</td><td>{row.pay_type_used === 'daily' ? 'รายวัน' : 'รายเดือน'} / {money(row.pay_rate_used)}</td>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(row[key], type)}</td>)}{columns.map(([key]) => <td className="text-right tabular-nums" key={key}>{money(row[key])}</td>)}</tr>)}
+                {!data.rows.length && <tr><td colSpan="14">ไม่มีพนักงานในงวดนี้</td></tr>}
+            </tbody><tfoot><tr><th colSpan="3">รวมทั้งทีม</th>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(data.rows.some(row => row[key] == null) ? null : data.rows.reduce((sum, row) => sum + Number(row[key]), 0), type)}</td>)}{columns.map(([key]) => <td className="text-right font-semibold tabular-nums" key={key}>{money(data.rows.reduce((sum, row) => sum + Number(row[key]), 0))}</td>)}</tr></tfoot></table></div>
             {!data.saved && <button className="primary" disabled={busy || !data.rows.length} onClick={save}>ตรวจยอดแล้ว — บันทึกงวดนี้</button>}
             {data.saved && !data.period.published_at && <button className="primary" disabled={busy} onClick={publish}>เผยแพร่งวด</button>}
             {data.saved && <p className="font-semibold text-indigo-700">{data.period.published_at ? 'เผยแพร่ให้พนักงานแล้ว' : 'ยังไม่เผยแพร่ — พนักงานยังไม่เห็นงวดนี้'}</p>}

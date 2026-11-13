@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { api, bangkokToday, money, workHours, workTimePayload } from './api';
+import { api, isWeekend, bangkokToday, money, workHours, workTimePayload } from './api';
 
 export default function EmployeeWorkForm({ onCreated }) {
-    const [form, setForm] = useState(() => ({ work_date: bangkokToday(), shift_type: 'day', overtime_hours: '0', overtime_3x_hours: '0' }));
+    const [form, setForm] = useState(() => ({ work_date: bangkokToday(), shift_type: 'day', wage_multiplier: '1', overtime_hours: '0', overtime_3x_hours: '0' }));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const today = bangkokToday();
-    const change = e => setForm(current => ({ ...current, [e.target.name]: e.target.value }));
+    const change = e => setForm(current => ({ ...current, [e.target.name]: e.target.value, ...(e.target.name === 'work_date' ? { wage_multiplier: '1' } : {}) }));
     async function submit(e) {
         e.preventDefault(); if (saving) return;
         setError(''); setSuccess('');
@@ -29,6 +29,7 @@ export default function EmployeeWorkForm({ onCreated }) {
         <p className="mb-4 text-sm text-slate-600">บันทึกสำหรับบัญชีของคุณเท่านั้น เลือกวันนี้หรือย้อนหลังตามวันที่ประเทศไทย</p>
         <form onSubmit={submit}><fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
             <label>วันที่ทำงาน<input aria-label="วันที่ทำงาน" required type="date" name="work_date" max={today} value={form.work_date} onChange={change} /></label>
+            {isWeekend(form.work_date) && <label>ค่าแรงเสาร์–อาทิตย์<select name="wage_multiplier" value={form.wage_multiplier} onChange={change}><option value="1">ค่าแรงปกติ (1 เท่า)</option><option value="2">ค่าแรง 2 เท่า</option></select><span className="text-sm text-slate-500">ใช้กับค่าจ้างปกติรายวัน รายเดือนคงอัตราเดิม</span></label>}
             <label>เวลาปกติ<input aria-label="เวลาปกติ" readOnly value={workHours(480)} /><span className="text-sm text-slate-500">เวลาปกติเต็มวัน 8 ชม.</span></label>
             <label>กะ<select aria-label="กะ" name="shift_type" value={form.shift_type} onChange={change}><option value="day">กลางวัน</option><option value="night">กลางคืน (ค่ากะ 150 บาท)</option></select></label>
             <label>OT รวม<span className="flex items-center gap-2"><input aria-label="OT รวม" required type="number" min="0" max="16" step="any" name="overtime_hours" value={form.overtime_hours} onChange={change} /><span>ชม.</span></span></label>

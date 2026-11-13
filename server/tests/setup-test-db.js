@@ -18,5 +18,6 @@ try {
   await db.query(await readFile(new URL('../migrations/001_saved_reports.sql', import.meta.url), 'utf8'));
   await db.query(await readFile(new URL('../migrations/002_auth.sql', import.meta.url), 'utf8'));
   await db.query(await readFile(new URL('../migrations/003_employee_status.sql', import.meta.url), 'utf8'));
+  await db.query(await readFile(new URL('../migrations/004_weekend_payroll_metrics.sql', import.meta.url), 'utf8'));
   console.log('Created isolated empty test database:', name);
 } finally { await db.end(); }

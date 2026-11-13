@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, money, thaiDate, workHours, workTimePayload } from './api';
+import { api, isWeekend, bangkokToday, money, thaiDate, workHours, workTimePayload } from './api';
 
-const empty = { employee_id: '', work_date: '', overtime_hours: '0', overtime_3x_hours: '0', shift_type: 'day' };
+const empty = { employee_id: '', work_date: '', overtime_hours: '0', overtime_3x_hours: '0', shift_type: 'day', wage_multiplier: '1' };
 export default function WorkLogs({ employees }) {
     const [form, setForm] = useState(empty);
     const [logs, setLogs] = useState([]);
@@ -20,7 +20,7 @@ export default function WorkLogs({ employees }) {
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, []);
-    const change = e => setForm(current => ({ ...current, [e.target.name]: e.target.value }));
+    const change = e => setForm(current => ({ ...current, [e.target.name]: e.target.value, ...(e.target.name === 'work_date' ? { wage_multiplier: '1' } : {}) }));
     async function searchHistory(e) {
         e.preventDefault(); setLoading(true); setError('');
         const params = new URLSearchParams();
@@ -53,7 +53,8 @@ export default function WorkLogs({ employees }) {
             <h2 className="mb-4 text-lg font-semibold">บันทึกการทำงาน</h2>
             <form onSubmit={submit}><fieldset disabled={saving || activeEmployees.length === 0} className="grid gap-4 sm:grid-cols-2">
                 <label>พนักงาน<select required name="employee_id" value={form.employee_id} onChange={change}><option value="">เลือกพนักงาน</option>{activeEmployees.map(e => <option key={e.id} value={e.id}>{e.employee_code} — {e.full_name}</option>)}</select></label>
-                <label>วันที่ทำงาน<input required type="date" name="work_date" value={form.work_date} onChange={change} /></label>
+                <label>วันที่ทำงาน<input required type="date" max={bangkokToday()} name="work_date" value={form.work_date} onChange={change} /></label>
+                {isWeekend(form.work_date) && <label>ค่าแรงเสาร์–อาทิตย์<select name="wage_multiplier" value={form.wage_multiplier} onChange={change}><option value="1">ค่าแรงปกติ (1 เท่า)</option><option value="2">ค่าแรง 2 เท่า</option></select><span className="text-sm text-slate-500">ใช้กับค่าจ้างปกติรายวัน รายเดือนคงอัตราเดิม</span></label>}
                 <label>เวลาปกติ<input aria-label="เวลาปกติ" value={workHours(480)} readOnly /><span className="text-sm text-slate-500">เวลาปกติเต็มวัน 8 ชม.</span></label>
                 <label>กะ<select name="shift_type" value={form.shift_type} onChange={change}><option value="day">กลางวัน</option><option value="night">กลางคืน (ค่ากะ 150 บาท)</option></select></label>
                 <label>OT รวม<span className="flex items-center gap-2"><input aria-label="OT รวม" required type="number" min="0" max="16" step="any" name="overtime_hours" value={form.overtime_hours} onChange={change} /><span>ชม.</span></span></label>
@@ -72,9 +73,9 @@ export default function WorkLogs({ employees }) {
             <button disabled={loading} className="primary self-end">ค้นประวัติ</button>
         </form>
         <div className="table-wrap"><h2 className="p-4 font-semibold">รายการล่าสุด 100 รายการ</h2>
-            {loading ? <p role="status" className="p-4">กำลังโหลด…</p> : <table><thead><tr>{['วันที่', 'พนักงาน', 'กะ', 'ปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>
-                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.employee_code} {log.full_name}</td><td>{log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td></tr>)}
-                {!logs.length && <tr><td colSpan="7">ยังไม่มีบันทึก</td></tr>}
+            {loading ? <p role="status" className="p-4">กำลังโหลด…</p> : <table><thead><tr>{['วันที่', 'พนักงาน', 'กะ', 'ค่าแรงที่เลือก', 'ปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>
+                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.employee_code} {log.full_name}</td><td>{log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td></tr>)}
+                {!logs.length && <tr><td colSpan="8">ยังไม่มีบันทึก</td></tr>}
             </tbody></table>}
         </div>
     </section>;
