@@ -44,9 +44,20 @@ try {
  await user.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
  await user.getByLabel('เดือนที่ทำงาน',{exact:true}).fill(date.slice(0,7));
  await user.getByRole('button',{name:'แก้ไข OT',exact:true}).click();
- await user.getByLabel('OT รวม',{exact:true}).fill('1.5');await user.getByLabel('อัตรา OT',{exact:true}).selectOption('2');
- const [edit]=await Promise.all([user.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/overtime')),user.getByRole('button',{name:'บันทึกการแก้ไข',exact:true}).click()]);assert.equal(edit.status(),200);assert.equal((await edit.json()).data.overtime_2x_minutes,90);
+ assert.deepEqual(await user.getByLabel('อัตรา OT',{exact:true}).locator('option').allTextContents(),['1.5 เท่า','3.0 เท่า']);
+ await user.getByLabel('OT รวม',{exact:true}).fill('1.5');await user.getByLabel('อัตรา OT',{exact:true}).selectOption('3');
+ const [edit]=await Promise.all([user.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/overtime')),user.getByRole('button',{name:'บันทึกการแก้ไข',exact:true}).click()]);assert.equal(edit.status(),200);assert.equal((await edit.json()).data.overtime_3x_minutes,90);
  await user.getByRole('cell',{name:'1.5 ชม.',exact:true}).first().waitFor();await user.getByRole('cell',{name:'166.00',exact:true}).waitFor();
+ for(const [hours,minutes,meal] of [[String(29/60),29,'83.00'],['0.5',30,'166.00'],['1',60,'166.00'],[String(29/60),29,'83.00']]) {
+  await user.getByRole('button',{name:'แก้ไข OT',exact:true}).click();
+  await user.getByLabel('OT รวม',{exact:true}).fill(hours);
+  await user.getByLabel('อัตรา OT',{exact:true}).selectOption('3');
+  await user.getByText(`ค่าอาหารหลังแก้: ${meal} บาท`,{exact:false}).waitFor();
+  const [changed]=await Promise.all([user.waitForResponse(r=>r.request().method()==='PATCH'&&r.url().endsWith('/overtime')),user.getByRole('button',{name:'บันทึกการแก้ไข',exact:true}).click()]);
+  const data=(await changed.json()).data;
+  assert.equal(changed.status(),200);assert.equal(data.overtime_minutes,minutes);assert.equal(data.overtime_3x_minutes,minutes);assert.equal(data.meal_allowance,meal);
+  await user.getByRole('cell',{name:meal,exact:true}).waitFor();
+ }
  await user.getByRole('button',{name:'ลงวันลา',exact:true}).click();
  await user.getByLabel('วันที่ลา',{exact:true}).fill(leaveDate);await user.getByLabel('ค่าแรงวันลา').selectOption('true');
  const [leave]=await Promise.all([user.waitForResponse(r=>r.url().endsWith('/me/leaves')&&r.request().method()==='POST'),user.getByRole('button',{name:'บันทึกวันลา',exact:true}).click()]);assert.equal(leave.status(),201);

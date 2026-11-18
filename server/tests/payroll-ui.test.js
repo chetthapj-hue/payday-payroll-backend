@@ -26,13 +26,34 @@ test('company holiday or weekend can submit three times wage; ordinary weekday r
 });
 
 
-test('one OT hours input selects 1/1.5/2/3; legacy mixed rates round trip without conversion',()=>{
- for(const rate of ['1','1.5','2','3']) {
+test('OT hours and multiplier accept only 1.5/3; legacy 1.5+3 split round trips',()=>{
+ for(const rate of ['1.5','3']) {
   const payload=overtimePayload({overtime_hours:'2',overtime_rate:rate});
   assert.equal(payload.overtime_minutes,120);
   for(const component of [1,2,3])assert.equal(payload[`overtime_${component}x_minutes`],rate===String(component)?120:0);
  }
  const mixed={overtime_minutes:120,overtime_1x_minutes:0,overtime_2x_minutes:0,overtime_3x_minutes:30};
  const form=overtimeForm(mixed);assert.equal(form.overtime_rate,'split');assert.deepEqual(overtimePayload(form),mixed);
- assert.throws(()=>overtimePayload({...form,overtime_3x_hours:'3'}),/ส่วนแบ่ง/);
+ assert.throws(()=>overtimePayload({...form,overtime_3x_hours:'3'}),/OT 3 เท่า/);
+});
+
+
+test('shared meal preview accepts 0.5h and checks 29/30/60 minutes without counting triple OT twice',async()=>{
+ const {workingMealAllowance}=await import('../../shared/meal-allowance.js');
+ for(const [hours,minutes,meal] of [[String(29/60),29,83],['0.5',30,166],['1',60,166]]) {
+  for(const rate of ['1.5','3']) {
+   const payload=overtimePayload({overtime_hours:hours,overtime_rate:rate});
+   assert.equal(payload.overtime_minutes,minutes);assert.equal(workingMealAllowance(payload.overtime_minutes),meal);
+  }
+ }
+});
+
+
+test('frontend rejects unsupported OT rates and refuses to convert legacy 1/2 components',()=>{
+ for(const rate of ['1','2','0','4','', 'NaN']) {
+  if(!rate) continue;
+  assert.throws(()=>overtimePayload({overtime_hours:'0.5',overtime_rate:rate}),/เฉพาะ/);
+ }
+ const legacy=overtimeForm({overtime_minutes:60,overtime_1x_minutes:0,overtime_2x_minutes:60,overtime_3x_minutes:0});
+ assert.throws(()=>overtimePayload(legacy),/ตรวจทาน/);
 });

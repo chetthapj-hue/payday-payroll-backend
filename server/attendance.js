@@ -1,3 +1,5 @@
+import { validateOvertimeRates, hasLegacyOvertime } from './overtime-policy.js';
+import { workingMealAllowance } from '../shared/meal-allowance.js';
 import { createHash } from 'node:crypto';
 import { bangkokToday } from './work-logs.js';
 
@@ -51,18 +53,20 @@ async function ownLog(db,logId,actor) {
  return row;
 }
 export async function editOvertime(pool,logId,input,actor) {
+ validateOvertimeRates(input);
  const {overtime_minutes:ot,overtime_3x_minutes:triple}=input || {};
  if(!Number.isInteger(ot)||!Number.isInteger(triple)||ot<0||ot>960||triple<0||triple>ot)
   throw fail(400,'OT ต้องเป็นนาทีเต็ม ไม่ติดลบ ไม่เกิน 16 ชม. และ OT 3 เท่าต้องไม่เกิน OT รวม');
  return attendanceTransaction(pool,async db=>{
   const before=await ownLog(db,logId,actor);
-  const ot1=input.overtime_1x_minutes ?? before.overtime_1x_minutes,ot2=input.overtime_2x_minutes ?? before.overtime_2x_minutes;
+  if(hasLegacyOvertime(before)) throw fail(409,'รายการเดิมมี OT อัตราอื่น เก็บข้อมูลไว้เดิม ต้องตรวจทานก่อนแก้ไข ไม่มีการแปลงอัตราอัตโนมัติ','LEGACY_OT_REVIEW_REQUIRED');
+  const ot1=0,ot2=0;
   if(!Number.isInteger(ot1)||!Number.isInteger(ot2)||ot1<0||ot2<0||ot1+ot2+triple>ot) throw fail(400,'ส่วนแบ่ง OT ต้องไม่ติดลบและรวมกันไม่เกิน OT รวม');
   if(before.attendance_status!=='work') throw fail(409,'วันลาไม่สามารถลง OT ได้','LEAVE_CONFLICT');
   if(before.regular_minutes+ot>1440) throw fail(400,'เวลารวมต้องไม่เกิน 24 ชม.');
   if(before.work_date>bangkokToday()) throw fail(400,'ไม่สามารถแก้วันในอนาคต');
   const after=(await db.query(`UPDATE public.work_logs SET overtime_minutes=$1,overtime_3x_minutes=$2,
-   meal_allowance=$3,source='manual',overtime_1x_minutes=$5,overtime_2x_minutes=$6 WHERE id=$4 RETURNING *,work_date::text`,[ot,triple,ot>=60?'166.00':'83.00',before.id,ot1,ot2])).rows[0];
+   meal_allowance=$3,source='manual',overtime_1x_minutes=$5,overtime_2x_minutes=$6 WHERE id=$4 RETURNING *,work_date::text`,[ot,triple,workingMealAllowance(ot).toFixed(2),before.id,ot1,ot2])).rows[0];
   await audit(db,before,after,actor,'edit_ot'); return after;
  });
 }

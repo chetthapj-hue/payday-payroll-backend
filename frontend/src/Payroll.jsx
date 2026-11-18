@@ -1,3 +1,4 @@
+import { MEAL_POLICY_NOTICE } from '../../shared/meal-allowance.js';
 import { useEffect, useState } from 'react';
 import { api, money, thaiDate, payrollMetrics, metricValue } from './api';
 
@@ -66,8 +67,9 @@ export default function Payroll({ reportsOnly }) {
                 <h3 className="font-bold">งวดจ่าย {thaiDate(data.period.payment_date)} — {data.saved ? 'รายงานที่บันทึกแล้ว' : 'ยอดคำนวณ ยังไม่บันทึก'}</h3>
                 <p>ค่าจ้างปกติ / ค่าอาหาร / ค่ากะ: {thaiDate(data.period.start_date)} ถึง {thaiDate(data.period.end_date)}</p>
                 <p>OT: {thaiDate(data.period.overtime_start_date)} ถึง {thaiDate(data.period.overtime_end_date)}</p>
-                <p className="text-sm">รวมวันต้นและวันท้าย ค่าอาหารรวมส่วนเพิ่ม OT ที่บันทึกแล้ว จึงไม่บวก 83 บาทซ้ำ</p>
+                <p className="text-sm">รวมวันต้นและวันท้าย ค่าอาหารใช้รอบ 17–16 รวมส่วนเพิ่ม OT ตามกติกาของงวด โดยไม่บวก OT 3 เท่าซ้ำ</p>
             </div>
+            {!data.saved && <p role="note" className="rounded-xl bg-amber-50 p-4">{MEAL_POLICY_NOTICE}</p>}
             <div className="table-wrap"><table><thead><tr><th>รหัส</th><th>ชื่อพนักงาน</th><th>ประเภท / อัตรา</th>{payrollMetrics.map(([key, title]) => <th key={key}>{title}</th>)}{columns.map(([key, title]) => <th key={key}>{title}</th>)}</tr></thead><tbody>
                 {data.rows.map(row => <tr key={row.employee_id}><td>{row.employee_code}</td><td>{row.full_name}</td><td>{row.pay_type_used === 'daily' ? 'รายวัน' : 'รายเดือน'} / {money(row.pay_rate_used)}</td>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(row[key], type)}</td>)}{columns.map(([key]) => <td className="text-right tabular-nums" key={key}>{money(row[key])}</td>)}</tr>)}
                 {!data.rows.length && <tr><td colSpan={3 + payrollMetrics.length + columns.length}>ไม่มีพนักงานในงวดนี้</td></tr>}

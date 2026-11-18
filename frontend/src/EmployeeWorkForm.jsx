@@ -1,3 +1,4 @@
+import { workingMealAllowance } from '../../shared/meal-allowance.js';
 import OvertimeFields from './OvertimeFields';
 import { useEffect, useState } from 'react';
 import { api, isWeekend, bangkokToday, money, workHours, workTimePayload } from './api';
@@ -40,7 +41,7 @@ export default function EmployeeWorkForm({ onCreated }) {
             <label>เวลาปกติ<input aria-label="เวลาปกติ" readOnly value={workHours(480)} /><span className="text-sm text-slate-500">เวลาปกติเต็มวัน 8 ชม.</span></label>
             <label>กะ<select aria-label="กะ" name="shift_type" value={form.shift_type} onChange={change}><option value="day">กลางวัน</option><option value="night">กลางคืน (ค่ากะ 150 บาท)</option></select></label>
             <OvertimeFields form={form} onChange={change} />
-            <p>ค่าอาหาร: <strong>{money(Math.round(Number(form.overtime_hours) * 60) >= 60 ? 166 : 83)} บาท</strong><br /><span className="text-sm text-slate-500">ฐาน 83 บาท + เพิ่ม 83 บาทเมื่อ OT รวมตั้งแต่ 1 ชม. เก็บรวมครั้งเดียว</span></p>
+            <p>ค่าอาหาร: <strong>{money(workingMealAllowance(Math.round(Number(form.overtime_hours) * 60)))} บาท</strong><br /><span className="text-sm text-slate-500">ฐาน 83 บาท + เพิ่ม 83 บาทเมื่อ OT รวมตั้งแต่ 0.5 ชม. (30 นาที) เก็บรวมครั้งเดียว</span></p>
             <p className="text-sm text-slate-500 sm:col-span-2">กรอกทศนิยมได้ เช่น 1.5 ชม. หรือ 0.25 ชม. ปัดเป็นนาทีเต็มที่ใกล้ที่สุดก่อนบันทึก</p>
             <button className="primary sm:col-span-2">{saving ? 'กำลังบันทึก…' : 'บันทึกเวลาของฉัน'}</button>
         </fieldset></form>

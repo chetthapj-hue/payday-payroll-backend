@@ -1,3 +1,4 @@
+import { OT_MEAL_MINUTES, NORMAL_MEAL_BAHT, OT_MEAL_BAHT } from '../shared/meal-allowance.js';
 import { createHash } from 'node:crypto';
 
 export function periodDates(month) {
@@ -16,13 +17,17 @@ export function periodDates(month) {
 
 // Formula source: save_period_payroll.sql and period_allowances.sql.
 // Keep PostgreSQL numeric arithmetic and round each component before gross pay.
+// Live accrual/unsaved previews use the current policy; saved reports bypass this SQL.
+// Preserve nonstandard legacy meal amounts and leave eligibility. Never rewrite work rows here.
 const calculationSQL = `
 WITH work AS (
  SELECT employee_id, COUNT(DISTINCT work_date) FILTER (WHERE attendance_status='work') AS days,
  COUNT(*) FILTER (WHERE attendance_status='sick')::integer AS sick_days,
  COUNT(*) FILTER (WHERE attendance_status='personal')::integer AS personal_days,
  SUM(CASE WHEN attendance_status='work' THEN wage_multiplier ELSE leave_wage_fraction END) AS paid_days,
- SUM(COALESCE(leave_monthly_deduction_fraction,0)) AS monthly_deductions, SUM(meal_allowance) AS meal,
+ SUM(COALESCE(leave_monthly_deduction_fraction,0)) AS monthly_deductions, ROUND(SUM(CASE WHEN attendance_status='work' AND meal_allowance IN ($7::numeric,$7::numeric+$8::numeric)
+ THEN $7::numeric + CASE WHEN overtime_minutes >= $6::integer THEN $8::numeric ELSE 0 END
+ ELSE meal_allowance END),2) AS meal,
  SUM(CASE WHEN attendance_status='work' AND shift_type='night' THEN 150.00 ELSE 0.00 END) AS shift
  FROM public.work_logs WHERE work_date BETWEEN $1::date AND $2::date AND ($5::integer IS NULL OR employee_id=$5) GROUP BY employee_id
 ), overtime AS (
@@ -64,7 +69,7 @@ export async function calculate(db, period, employeeId = null) {
   if (invalid.rows.length) {
     throw Object.assign(new Error(`คำนวณไม่ได้: บันทึกเวลา ${invalid.rows.map(r => r.id).join(', ')} มีวันไม่เต็มหรือข้อมูลกะ/OT ไม่ครบ ต้องยืนยันกติกาก่อน`), { status: 422 });
   }
-  return (await db.query(calculationSQL, values)).rows;
+  return (await db.query(calculationSQL, [...values, OT_MEAL_MINUTES, NORMAL_MEAL_BAHT, OT_MEAL_BAHT])).rows;
 }
 const tokenFor = (period, rows) => createHash('sha256').update(JSON.stringify({ period, rows })).digest('hex');
 const periodSelect = `SELECT id,period_name,start_date::text,end_date::text,

@@ -67,20 +67,18 @@ export function overtimePayload(form) {
     const overtime_minutes = hoursToMinutes(form.overtime_hours);
     if (Number(form.overtime_hours) > 16) throw new Error('เวลาปกติและ OT รวมต้องไม่เกิน 24 ชม. ต่อวัน');
     const single = form.overtime_rate && form.overtime_rate !== 'split';
-    if (single && !['1', '1.5', '2', '3'].includes(form.overtime_rate)) throw new Error('กรุณาเลือกอัตรา OT');
-    const component = rate => single ? (form.overtime_rate === String(rate) ? overtime_minutes : 0) : hoursToMinutes(form[`overtime_${rate}x_hours`] ?? 0);
-    const overtime_1x_minutes = component(1), overtime_2x_minutes = component(2), overtime_3x_minutes = component(3);
-    if (!single && [1, 2, 3].reduce((sum, rate) => sum + Number(form[`overtime_${rate}x_hours`] ?? 0), 0) > Number(form.overtime_hours)) throw new Error('ส่วนแบ่ง OT ต้องไม่เกิน OT รวม');
-    if (overtime_1x_minutes + overtime_2x_minutes + overtime_3x_minutes > overtime_minutes) throw new Error('ส่วนแบ่ง OT ต้องไม่เกิน OT รวม');
-    return { overtime_minutes, overtime_1x_minutes, overtime_2x_minutes, overtime_3x_minutes };
+    if (single && !['1.5', '3', '3.0'].includes(String(form.overtime_rate))) throw new Error('OT อนุญาตเฉพาะ 1.5 และ 3.0 เท่า');
+    if (Number(form.overtime_1x_hours ?? 0) !== 0 || Number(form.overtime_2x_hours ?? 0) !== 0) throw new Error('รายการเดิมมี OT อัตราอื่น ต้องตรวจทานก่อนแก้ไข');
+    const overtime_3x_minutes = single ? (Number(form.overtime_rate) === 3 ? overtime_minutes : 0) : hoursToMinutes(form.overtime_3x_hours ?? 0);
+    if (!single && Number(form.overtime_3x_hours ?? 0) > Number(form.overtime_hours)) throw new Error('OT 3 เท่าต้องไม่เกิน OT รวม');
+    if (overtime_3x_minutes > overtime_minutes) throw new Error('OT 3 เท่าต้องไม่เกิน OT รวม');
+    return { overtime_minutes, overtime_1x_minutes: 0, overtime_2x_minutes: 0, overtime_3x_minutes,
+        ...(single ? { overtime_rate: Number(form.overtime_rate) } : {}) };
 }
 export function overtimeForm(log) {
-    const total = log.overtime_minutes;
-    const components = [[1, log.overtime_1x_minutes ?? 0], [2, log.overtime_2x_minutes ?? 0], [3, log.overtime_3x_minutes ?? 0]];
-    components.push([1.5, total - components.reduce((sum, [, minutes]) => sum + minutes, 0)]);
-    const rates = components.filter(([, minutes]) => minutes > 0);
-    return { overtime_hours: String(total / 60), overtime_rate: rates.length > 1 ? 'split' : String(rates[0]?.[0] ?? 1.5),
-        overtime_1x_hours: String((log.overtime_1x_minutes ?? 0) / 60), overtime_2x_hours: String((log.overtime_2x_minutes ?? 0) / 60), overtime_3x_hours: String((log.overtime_3x_minutes ?? 0) / 60) };
+    const total = log.overtime_minutes, triple = log.overtime_3x_minutes ?? 0;
+    return { overtime_hours: String(total / 60), overtime_rate: triple > 0 && triple < total ? 'split' : triple > 0 ? '3' : '1.5',
+        overtime_1x_hours: String((log.overtime_1x_minutes ?? 0) / 60), overtime_2x_hours: String((log.overtime_2x_minutes ?? 0) / 60), overtime_3x_hours: String(triple / 60) };
 }
 export function workTimePayload(form, { holidayDates = [] } = {}) {
     return { wage_multiplier: (isWeekend(form.work_date) || holidayDates.includes(form.work_date)) ? Number(form.wage_multiplier ?? 1) : 1,

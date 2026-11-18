@@ -1,3 +1,4 @@
+import { workingMealAllowance } from '../../shared/meal-allowance.js';
 import OvertimeFields from './OvertimeFields';
 import AttendanceActions from './AttendanceActions';
 import LeaveForm from './LeaveForm';
@@ -79,7 +80,7 @@ export default function WorkLogs({ employees }) {
                 <label>เวลาปกติ<input aria-label="เวลาปกติ" value={workHours(480)} readOnly /><span className="text-sm text-slate-500">เวลาปกติเต็มวัน 8 ชม.</span></label>
                 <label>กะ<select name="shift_type" value={form.shift_type} onChange={change}><option value="day">กลางวัน</option><option value="night">กลางคืน (ค่ากะ 150 บาท)</option></select></label>
                 <OvertimeFields form={form} onChange={change} />
-            <p className="sm:col-span-2">ค่าอาหารตามกติกา: <strong>{money(Math.round(Number(form.overtime_hours) * 60) >= 60 ? 166 : 83)} บาท</strong> (ฐาน 83 บาท + ค่าอาหารเพิ่ม 83 บาทเมื่อ OT รวมตั้งแต่ 1 ชม. เก็บรวมครั้งเดียว)</p>
+            <p className="sm:col-span-2">ค่าอาหารตามกติกา: <strong>{money(workingMealAllowance(Math.round(Number(form.overtime_hours) * 60)))} บาท</strong> (ฐาน 83 บาท + ค่าอาหารเพิ่ม 83 บาทเมื่อ OT รวมตั้งแต่ 0.5 ชม. (30 นาที) เก็บรวมครั้งเดียว)</p>
                 <p className="text-sm text-slate-500 sm:col-span-2">กรอกทศนิยมได้ เช่น 1.5 ชม. หรือ 0.25 ชม. ระบบปัดเป็นนาทีเต็มที่ใกล้ที่สุดก่อนบันทึก</p>
                 <button className="primary sm:col-span-2">{saving ? 'กำลังบันทึก…' : 'บันทึกเวลาทำงาน'}</button>
             </fieldset></form>

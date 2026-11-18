@@ -1,6 +1,7 @@
+import { workingMealAllowance } from '../../shared/meal-allowance.js';
 import OvertimeFields from './OvertimeFields';
 import { useState } from 'react';
-import { api, overtimePayload, overtimeForm, thaiDate } from './api';
+import { api, overtimePayload, overtimeForm, thaiDate, money } from './api';
 
 export default function AttendanceActions({ log, employee = false, onSaved }) {
     const [editing, setEditing] = useState(false);
@@ -29,10 +30,12 @@ export default function AttendanceActions({ log, employee = false, onSaved }) {
             setEditing(false); await onSaved(row);
         } catch (e) { setError(e.message); } finally { setBusy(false); }
     }
+    if (!isLeave && ((log.overtime_1x_minutes ?? 0) > 0 || (log.overtime_2x_minutes ?? 0) > 0)) return <p role="note" className="text-amber-800">รายการเดิมมี OT 1/2 เท่า เก็บไว้ตามเดิม ต้องตรวจทานก่อนแก้ไขอัตราหรือชั่วโมง</p>;
     return <div className="min-w-40 space-y-2">
         <button type="button" onClick={() => { if (!editing) { setForm(overtimeForm(log)); setType(log.attendance_status === 'personal' ? 'personal' : 'sick'); setPaid(Boolean(log.leave_paid)); } setEditing(v => !v); setError(''); }}>{isLeave ? 'แก้ไขวันลา' : 'แก้ไข OT'}</button>
         {editing && <form onSubmit={save} aria-label={`แก้ไข ${thaiDate(log.work_date)}`}><fieldset disabled={busy} className="space-y-2">
             {isLeave ? <label>ประเภทวันลา<select value={type} onChange={e => setType(e.target.value)}><option value="sick">ลาป่วย</option><option value="personal">ลากิจ</option></select></label> : <OvertimeFields form={form} onChange={e => setForm(current => ({ ...current, [e.target.name]: e.target.value }))} />}
+            {!isLeave && <p>ค่าอาหารหลังแก้: {money(workingMealAllowance(Math.round(Number(form.overtime_hours) * 60)))} บาท (เพิ่ม 83 บาทเมื่อ OT รวมตั้งแต่ 0.5 ชม. / 30 นาที เพียงครั้งเดียว)</p>}
             {!employee && <p className="text-sm">เปลี่ยนต้นทางเท่านั้น ยอดในรายงานที่บันทึกแล้วคงเดิม</p>}
             <button className="primary">บันทึกการแก้ไข</button>
             {isLeave && <label>ค่าแรงวันลา<select value={String(paid)} onChange={e => setPaid(e.target.value === 'true')}><option value="false">ลาไม่ได้เงิน</option><option value="true">ลาได้เงิน</option></select><span className="text-sm">ไม่มีค่าอาหารทั้งสองแบบ</span></label>}

@@ -108,7 +108,7 @@ try {
  for(const [date,hours,triple,minutes,tripleMinutes,meal] of [
   ['2025-02-01','2','3',120,120,'166.00'],
   ['2025-02-02','1','1.5',60,0,'166.00'],
-  ['2025-02-03','0.25','2',15,0,'83.00']]) {
+  ['2025-02-03','0.25','1.5',15,0,'83.00']]) {
   await page.getByLabel('วันที่ทำงาน').fill(date);
   await page.getByLabel('OT รวม',{exact:true}).fill(hours);
   await page.getByLabel('อัตรา OT',{exact:true}).selectOption(triple);

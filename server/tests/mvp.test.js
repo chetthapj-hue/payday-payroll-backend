@@ -70,7 +70,7 @@ test('work logs: duplicate, invalid date, negative OT, triple subset, meal eligi
   assert.equal((await log(e.id,'2025-10-17',-1,0)).status,400);
   assert.equal((await log(e.id,'2025-02-30')).status,400);
   assert.equal((await log(e.id,'2025-10-17',961,0)).status,400);
-  assert.equal((await log(e.id,'2025-10-17',59,0)).data.meal_allowance,'83.00');
+  assert.equal((await log(e.id,'2025-10-17',29,0)).data.meal_allowance,'83.00');
   assert.equal((await log(e.id,'2025-10-17')).status,409);
   assert.equal((await log(e.id,'2025-10-18')).data.meal_allowance,'166.00');
   assert.equal((await call('/work-logs')).data.length,2);
