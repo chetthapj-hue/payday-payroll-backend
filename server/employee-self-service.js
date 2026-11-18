@@ -1,6 +1,8 @@
+import {registerAttendanceRoutes} from './attendance.js';
 import {bangkokToday,createWorkLog} from './work-logs.js';
 import {calculate,periodDates} from './payroll.js';
 export function registerEmployeeSelfService(app,pool,requireEmployee) {
+ registerAttendanceRoutes(app,pool,requireEmployee,{employee:true});
  app.post('/api/me/work-logs',requireEmployee,async(req,res)=>{
   const row=await createWorkLog(pool,req.body,{employeeId:req.auth.employee_id,latestDate:bangkokToday()});
   res.status(201).json({data:row});

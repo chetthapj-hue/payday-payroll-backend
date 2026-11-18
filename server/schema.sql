@@ -149,7 +149,7 @@ CREATE TABLE public.work_logs (
     employee_id integer NOT NULL,
     work_date date NOT NULL,
     regular_minutes integer NOT NULL,
-    wage_multiplier smallint DEFAULT 1 NOT NULL CHECK (wage_multiplier IN (1,2) AND (wage_multiplier=1 OR EXTRACT(ISODOW FROM work_date) IN (6,7))),
+    wage_multiplier smallint DEFAULT 1 NOT NULL CONSTRAINT work_logs_wage_multiplier_check CHECK (wage_multiplier IN (1,2) AND (wage_multiplier=1 OR EXTRACT(ISODOW FROM work_date) IN (6,7))),
     overtime_minutes integer DEFAULT 0 NOT NULL,
     meal_allowance numeric(10,2) DEFAULT 0 NOT NULL,
     shift_type text,

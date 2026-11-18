@@ -17,6 +17,9 @@
     "migrate": "npm --prefix server run migrate",
     "create-admin": "npm --prefix server run create-admin --",
     "test:browser": "npm --prefix server run test:browser",
-    "check:git": "node scripts/check-git-files.mjs"
+    "check:git": "node scripts/check-git-files.mjs",
+    "attendance:run": "npm --prefix server run attendance:run",
+    "test:browser:attendance": "npm --prefix server run test:browser:attendance",
+    "attendance:configure": "npm --prefix server run attendance:configure"
   }
 }

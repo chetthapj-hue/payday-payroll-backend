@@ -10,7 +10,10 @@
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "create-admin": "node create-admin.js",
     "db:init": "node init-db.js",
-    "test:browser": "node tests/run-browser-tests.js"
+    "test:browser": "node tests/run-browser-tests.js",
+    "attendance:run": "node run-attendance-job.js",
+    "test:browser:attendance": "PAYDAY_BROWSER_TESTS=attendance-browser.mjs node tests/run-browser-tests.js",
+    "attendance:configure": "node configure-attendance.js"
   },
   "keywords": [],
   "author": "",

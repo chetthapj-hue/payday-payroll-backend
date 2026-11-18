@@ -25,7 +25,7 @@ async function login(login,password,role='employee') {
 }
 before(async()=>{
  assert.equal((await pool.query('SELECT current_database() AS n')).rows[0].n,name);
- for(const f of ['001_saved_reports.sql','002_auth.sql','003_employee_status.sql','004_weekend_payroll_metrics.sql'])await pool.query(await readFile(new URL(`../migrations/${f}`,import.meta.url),'utf8'));
+ for(const f of ['001_saved_reports.sql','002_auth.sql','003_employee_status.sql','004_weekend_payroll_metrics.sql','005_attendance.sql','006_premium_rates.sql'])await pool.query(await readFile(new URL(`../migrations/${f}`,import.meta.url),'utf8'));
  server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base=`http://127.0.0.1:${server.address().port}/api`;
 });
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();});

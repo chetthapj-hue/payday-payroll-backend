@@ -6,7 +6,7 @@ assert.ok(process.env.PAYDAY_TEST_ADMIN_PASSWORD,'Use isolated test runner');
 const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 const errors=[];
 async function login(page,code,password,role='employee'){
- await page.goto(base);await page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await page.goto(base);await page.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  await page.getByLabel('ประเภทบัญชี',{exact:true}).selectOption(role);
  await page.getByLabel(role==='admin'?'ชื่อผู้ดูแลระบบ':'รหัสพนักงาน',{exact:true}).fill(code);
  await page.getByLabel('รหัสผ่าน',{exact:true}).fill(password);

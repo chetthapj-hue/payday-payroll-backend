@@ -8,7 +8,7 @@ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '
 const errors=[];
 async function newPage(){const page=await browser.newPage({viewport:{width:1440,height:1100}});page.on('pageerror',e=>errors.push(e.message));return page;}
 async function login(page,code,password,role='employee'){
- await page.goto(base);await page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await page.goto(base);await page.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  await page.getByLabel('ประเภทบัญชี',{exact:true}).selectOption(role);
  await page.getByLabel(role==='admin'?'ชื่อผู้ดูแลระบบ':'รหัสพนักงาน',{exact:true}).fill(code);
  await page.getByLabel('รหัสผ่าน',{exact:true}).fill(password);
@@ -21,7 +21,7 @@ async function api(page,path,body){
  return {status:r.status(),...(await r.json())};
 }
 const fullDay=(date,extra={})=>({work_date:date,regular_minutes:480,overtime_minutes:0,overtime_3x_minutes:0,shift_type:'day',...extra});
-const card=(page,label)=>page.getByRole('region',{name:'รายได้สะสมของฉัน',exact:true}).locator('dl > div').filter({has:page.locator('dt',{hasText:label})}).locator('dd');
+const card=(page,label)=>page.getByRole('region',{name:'รายได้สะสมของฉัน',exact:true}).locator('dl > div').filter({has:page.getByText(label,{exact:true})}).locator('dd');
 try{
  const admin=await newPage();await login(admin,'browser-admin',process.env.PAYDAY_TEST_ADMIN_PASSWORD,'admin');
  await admin.getByRole('heading',{name:'เพิ่มพนักงาน',exact:true}).waitFor();
@@ -31,14 +31,14 @@ try{
  const temp=randomBytes(2).toString('hex'),password=temp.slice(0,3)+(temp[3]==='0'?'1':'0');
  assert.equal((await api(admin,`/employees/${e.id}/account`,{temporary_password:temp})).status,201);
  // Original published October payroll is frozen before the employee adds a backdated record.
- assert.equal((await api(admin,'/work-logs',{employee_id:e.id,...fullDay('2026-09-17')})).status,201);
- const preview=(await api(admin,'/payroll/preview?month=2026-10')).data;
- const saved=await api(admin,'/payroll/save',{month:'2026-10',preview_token:preview.preview_token});assert.equal(saved.status,201);
+ assert.equal((await api(admin,'/work-logs',{employee_id:e.id,...fullDay('2025-09-17')})).status,201);
+ const preview=(await api(admin,'/payroll/preview?month=2025-10')).data;
+ const saved=await api(admin,'/payroll/save',{month:'2025-10',preview_token:preview.preview_token});assert.equal(saved.status,201);
  const id=saved.data.period.id;
  assert.equal((await api(admin,`/payroll/periods/${id}/publish`,{})).status,200);
- for(const date of ['2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21'])
+ for(const date of ['2025-11-17','2025-11-18','2025-11-19','2025-11-20','2025-11-21'])
   assert.equal((await api(admin,'/work-logs',{employee_id:e.id,...fullDay(date)})).status,201);
- assert.equal((await api(admin,'/work-logs',{employee_id:e.id,...fullDay('2026-11-01',{overtime_minutes:384})})).status,201);
+ assert.equal((await api(admin,'/work-logs',{employee_id:e.id,...fullDay('2025-11-01',{overtime_minutes:384})})).status,201);
  const page=await newPage();await login(page,'SELF001',temp);
  await page.getByRole('heading',{name:'เปลี่ยนรหัสผ่านชั่วคราว',exact:true}).waitFor();
  await page.getByLabel('รหัสผ่านปัจจุบัน',{exact:true}).fill(temp);
@@ -48,13 +48,13 @@ try{
  await page.getByRole('heading',{name:'ข้อมูลของฉัน',exact:true}).waitFor();
  const published=(await api(page,`/me/payroll/${id}`)).data;assert.equal(published.base_pay,'500.00');
  await page.getByRole('button',{name:'รายได้สะสมของฉัน',exact:true}).click();
- await page.getByLabel('เดือนจ่ายสำหรับยอดสะสม',{exact:true}).fill('2026-12');
+ await page.getByLabel('เดือนจ่ายสำหรับยอดสะสม',{exact:true}).fill('2025-12');
  await page.getByText('จำนวนวันที่ลงงานในรอบค่าจ้าง:',{exact:false}).waitFor();
  await card(page,'ค่าจ้างปกติสะสม').filter({hasText:'2,500.00'}).waitFor();
  assert.match(await card(page,'OT 1.5 เท่า').innerText(),/600\.00/);
  assert.match(await card(page,'รายได้รวมสะสม').innerText(),/3,515\.00/);
  assert.match(await page.getByRole('region',{name:'รายได้สะสมของฉัน'}).innerText(),/5 วัน/);
- const own=(await api(page,`/me/accrued-income?month=2026-12&employee_id=${other.id}`)).data.row;
+ const own=(await api(page,`/me/accrued-income?month=2025-12&employee_id=${other.id}`)).data.row;
  assert.equal(own.employee_id,e.id);assert.equal(Number(own.base_pay)+Number(own.overtime_15_pay),3100);
  await page.getByRole('button',{name:'ลงเวลาทำงาน',exact:true}).click();
  const today=bangkokToday(),tomorrow=new Date(new Date(`${today}T00:00:00Z`).getTime()+86400000).toISOString().slice(0,10);
@@ -67,9 +67,9 @@ try{
  await dateInput.fill(today);
  await page.getByLabel('กะ',{exact:true}).selectOption('night');
  await page.getByLabel('OT รวม',{exact:true}).fill('2');
- await page.getByLabel('OT 3 เท่า',{exact:true}).fill('0.5');
+ await page.getByLabel('อัตรา OT',{exact:true}).selectOption('3');
  const [post]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/me/work-logs')&&r.request().method()==='POST'),page.getByRole('button',{name:'บันทึกเวลาของฉัน',exact:true}).click()]);
- assert.equal(post.status(),201);const body=post.request().postDataJSON();assert.equal(body.overtime_minutes,120);assert.equal(body.overtime_3x_minutes,30);assert.ok(!('employee_id' in body));
+ assert.equal(post.status(),201);const body=post.request().postDataJSON();assert.equal(body.overtime_minutes,120);assert.equal(body.overtime_3x_minutes,120);assert.ok(!('employee_id' in body));
  assert.equal((await post.json()).data.employee_id,e.id);
  await page.getByRole('status').filter({hasText:'ลงเวลาสำเร็จ'}).waitFor();
  // Live figures refresh without a page reload. Expected month follows the regular 17–16 cycle.
@@ -85,17 +85,17 @@ try{
  assert.equal((await api(page,'/me/work-logs',fullDay(yesterday,{employee_id:other.id}))).data.employee_id,e.id);
  assert.equal((await api(admin,`/work-logs?employee_id=${other.id}`)).data.length,0);
  // Past dates refresh history and the chosen accrual immediately, but not the published snapshot.
- await dateInput.fill('2026-09-18');await page.getByLabel('กะ',{exact:true}).selectOption('day');
- await page.getByLabel('OT รวม',{exact:true}).fill('0');await page.getByLabel('OT 3 เท่า',{exact:true}).fill('0');
+ await dateInput.fill('2025-09-18');await page.getByLabel('กะ',{exact:true}).selectOption('day');
+ await page.getByLabel('OT รวม',{exact:true}).fill('0');await page.getByLabel('อัตรา OT',{exact:true}).selectOption('1.5');
  const [past]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/me/work-logs')&&r.request().method()==='POST'),page.getByRole('button',{name:'บันทึกเวลาของฉัน',exact:true}).click()]);assert.equal(past.status(),201);
  await card(page,'ค่าจ้างปกติสะสม').filter({hasText:'1,000.00'}).waitFor();
  assert.deepEqual((await api(page,`/me/payroll/${id}`)).data,published);
  await page.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
- assert.equal(await page.getByLabel('เดือนที่ทำงาน',{exact:true}).inputValue(),'2026-09');
+ assert.equal(await page.getByLabel('เดือนที่ทำงาน',{exact:true}).inputValue(),'2025-09');
  assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'เงินเดือนของฉัน',exact:true}).click();
  await page.getByLabel('งวดเงินเดือนของฉัน',{exact:true}).selectOption(String(id));
- await page.getByRole('heading',{name:'เงินเดือนงวดจ่าย 25 ตุลาคม 2569',exact:true}).waitFor();
+ await page.getByRole('heading',{name:'เงินเดือนงวดจ่าย 25 ตุลาคม 2568',exact:true}).waitFor();
  const salary=page.locator('dl > div').filter({has:page.locator('dt',{hasText:'ค่าจ้างปกติ'})});assert.match(await salary.innerText(),/500\.00/);
  await page.getByRole('button',{name:'ลงเวลาทำงาน',exact:true}).click();
  await card(page,'ค่าจ้างปกติสะสม').filter({hasText:'1,000.00'}).waitFor();

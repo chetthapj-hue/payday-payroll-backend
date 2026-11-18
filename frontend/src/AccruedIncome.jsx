@@ -28,7 +28,7 @@ export default function AccruedIncome({ month, onMonthChange }) {
                 <p>รอบ OT: {thaiDate(data.period.overtime_start_date)} ถึง {thaiDate(data.period.overtime_end_date)}</p>
                 <p>จำนวนวันที่ลงงานในรอบค่าจ้าง: <strong>{data.row.recorded_days} วัน</strong></p>
                 <p className="text-sm">ข้อมูล ณ {thaiDate(data.as_of_date)} · OT เดือนปัจจุบันจะอยู่ในงวดจ่ายวันที่ 25 ของเดือนถัดไป</p>
-                {data.row.pay_type_used === 'monthly' && <p className="text-sm">รายเดือนใช้เต็มอัตรา {money(data.row.pay_rate_used)} บาทตามสูตรเดิม ไม่เฉลี่ยตามจำนวนวันที่ลงงาน</p>}
+                {data.row.pay_type_used === 'monthly' && <p className="text-sm">รายเดือนใช้เต็มอัตรา {money(data.row.pay_rate_used)} บาทก่อนหักลาไม่ได้เงินวันละเงินเดือน ÷ 30 ไม่เฉลี่ยตามจำนวนวันที่ลงงาน</p>}
             </div>
             <PayrollMetrics row={data.row} />
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,3 +1,4 @@
+import AttendanceSetup from './AttendanceSetup';
 import { useEffect, useState } from 'react';
 import EmployeeForm from './EmployeeForm';
 import WorkLogs from './WorkLogs';
@@ -77,11 +78,12 @@ function AdminDashboard() {
                 </header>
 
                 <nav aria-label="เมนูหลัก" className="mb-6 flex flex-wrap gap-2">
-                    {[['employees', 'พนักงาน'], ['work', 'บันทึกการทำงาน'], ['payroll', 'คำนวณเงินเดือน'], ['reports', 'รายงานที่บันทึก']].map(([id, label]) => (
+                    {[['employees', 'พนักงาน'], ['work', 'บันทึกการทำงาน'], ['payroll', 'คำนวณเงินเดือน'], ['reports', 'รายงานที่บันทึก'], ['attendance', 'วันทำงาน / วันหยุด']].map(([id, label]) => (
                         <button type="button" key={id} aria-current={tab === id ? 'page' : undefined}
                             onClick={() => setTab(id)} className={tab === id ? 'rounded-lg bg-indigo-600 px-4 py-2 text-white' : 'rounded-lg bg-white px-4 py-2'}>{label}</button>
                     ))}
                 </nav>
+                {!loading && !error && tab === 'attendance' && <AttendanceSetup employees={employees} onEmployeeSaved={handleEmployeeCreated} />}
                 {!loading && !error && tab === 'work' && <WorkLogs employees={employees} />}
                 {!loading && !error && (tab === 'payroll' || tab === 'reports') && <Payroll key={tab} reportsOnly={tab === 'reports'} />}
                 {!loading && !error && tab === 'employees' && (

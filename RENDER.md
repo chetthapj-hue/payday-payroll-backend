@@ -120,3 +120,7 @@ Environment จะ override ค่า DATABASE_URL ใน server/.env ของ 
 ## 7. ผลทดสอบและขอบเขต
 
 ดู [DEPLOY_TESTING.md](DEPLOY_TESTING.md) มีคำสั่งที่รันจริงทั้ง build จาก root, ฐานใหม่, HTTP origin เดียว และ HTTPS proxy ในเครื่อง ยังไม่ได้ทดสอบ Render จริงหรือ Linux container และยังไม่ย้ายข้อมูลจริง ค่าใช้จ่าย/สิทธิ์ Shell/ข้อจำกัดบริการให้ยืนยันจาก Dashboard ตอนเลือกแผน
+
+## งานอัตโนมัติและ migrations 005–006
+
+ดู [ATTENDANCE.md](server/ATTENDANCE.md) สำหรับ migration ใหม่, Render Cron Job แยกจาก web service, สวิตช์ปิดและการตรวจรัน ไม่เปิด job จนกำหนดวันเริ่ม/กะ/ปฏิทินวันหยุดครบ ค่าเริ่มต้นปิดอยู่

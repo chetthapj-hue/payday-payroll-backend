@@ -1,3 +1,7 @@
+import AttendanceActions from './AttendanceActions';
+import LeaveForm from './LeaveForm';
+import AttendanceSummary from './AttendanceSummary';
+import { attendanceLabel } from './api';
 import PayrollMetrics from './PayrollMetrics';
 import { useEffect, useState } from 'react';
 import { api, currentMonth, money, thaiDate, workHours, bangkokToday, payMonthForWorkDate } from './api';
@@ -40,16 +44,18 @@ export default function EmployeeDashboard({ user }) {
     return <main className="min-h-screen px-4 py-10"><div className="mx-auto max-w-6xl space-y-6">
         <header><p className="font-semibold text-indigo-600">PayDayเว้ย</p><h1 className="mt-2 text-3xl font-bold">ข้อมูลของฉัน</h1><p className="mt-2 text-slate-600">{user.login} — {user.full_name}</p></header>
         <nav aria-label="เมนูพนักงาน" className="flex flex-wrap gap-2">
-            {[['log', 'ลงเวลาทำงาน'], ['work', 'ประวัติการทำงาน'], ['accrued', 'รายได้สะสมของฉัน'], ['payroll', 'เงินเดือนของฉัน']].map(([id, label]) => <button type="button" key={id} aria-current={tab === id ? 'page' : undefined} className={tab === id ? 'primary' : 'rounded-lg bg-white px-5 py-3'} onClick={() => setTab(id)}>{label}</button>)}
+            {[['log', 'ลงเวลาทำงาน'], ['work', 'ประวัติการทำงาน'], ['leave', 'ลงวันลา'], ['accrued', 'รายได้สะสมของฉัน'], ['payroll', 'เงินเดือนของฉัน']].map(([id, label]) => <button type="button" key={id} aria-current={tab === id ? 'page' : undefined} className={tab === id ? 'primary' : 'rounded-lg bg-white px-5 py-3'} onClick={() => setTab(id)}>{label}</button>)}
         </nav>
         {error && <p role="alert" className="text-red-700">{error}</p>}
+        {tab === 'leave' && <LeaveForm onSaved={handleWorkCreated} />}
         {tab === 'log' && <EmployeeWorkForm onCreated={handleWorkCreated} />}
         {(tab === 'log' || tab === 'accrued') && <AccruedIncome key={`${accruedMonth}:${revision}`} month={accruedMonth} onMonthChange={setAccruedMonth} />}
         {tab === 'work' && <section className="space-y-4">
             <label className="block max-w-xs">เดือนที่ทำงาน<input required type="month" min="2000-01" max="2199-12" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); setLoading(true); setError(''); setLogs([]); } }} /></label>
-            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'กะ', 'ค่าแรงที่เลือก', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
-                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td></tr>)}
-                {!logs.length && <tr><td colSpan="7">ไม่มีประวัติในเดือนที่เลือกว่ะ</td></tr>}
+            <AttendanceSummary logs={logs} />
+            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'สถานะ', 'กะ', 'ค่าแรงที่เลือก', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 1 เท่า (ชั่วโมง)', 'OT 1.5 เท่า (ชั่วโมง)', 'OT 2 เท่า (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร', 'แก้ไข'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
+                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{attendanceLabel(log)}</td><td>{log.attendance_status && log.attendance_status !== 'work' ? '—' : log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_1x_minutes ?? 0)}</td><td>{workHours(log.overtime_minutes - (log.overtime_1x_minutes ?? 0) - (log.overtime_2x_minutes ?? 0) - log.overtime_3x_minutes)}</td><td>{workHours(log.overtime_2x_minutes ?? 0)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td><td><AttendanceActions log={log} employee onSaved={handleWorkCreated} /></td></tr>)}
+                {!logs.length && <tr><td colSpan="12">ไม่มีประวัติในเดือนที่เลือกว่ะ</td></tr>}
             </tbody></table></div>}
         </section>}
         {tab === 'payroll' && <section className="space-y-4">

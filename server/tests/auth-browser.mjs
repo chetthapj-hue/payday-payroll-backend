@@ -12,7 +12,7 @@ const newPage=async()=>{
 };
 async function login(page,code,password,role='employee'){
  await page.goto(base);
- await page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await page.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  await page.getByLabel('ประเภทบัญชี',{exact:true}).selectOption(role);
  await page.getByLabel(role==='admin'?'ชื่อผู้ดูแลระบบ':'รหัสพนักงาน',{exact:true}).fill(code);
  await page.getByLabel('รหัสผ่าน',{exact:true}).fill(password);
@@ -66,11 +66,11 @@ try {
   assert.equal((await get(page,`/me/payroll/${period.id}`)).status,404);
   if(code==='UI002') {
    await page.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
-   await Promise.all([page.waitForResponse(r=>r.url().includes('/api/me/work-logs?month=2027-02')),page.getByLabel('เดือนที่ทำงาน',{exact:true}).fill('2027-02')]);
-   const row=page.locator('tbody tr').filter({hasText:'1 กุมภาพันธ์ 2570'});await row.waitFor();
-   assert.equal(await row.locator('td').nth(2).innerText(),'8 ชม.');
-   assert.equal(await row.locator('td').nth(3).innerText(),'2 ชม.');
-   assert.equal(await row.locator('td').nth(4).innerText(),'0.25 ชม.');
+   await Promise.all([page.waitForResponse(r=>r.url().includes('/api/me/work-logs?month=2025-02')),page.getByLabel('เดือนที่ทำงาน',{exact:true}).fill('2025-02')]);
+   const row=page.locator('tbody tr').filter({hasText:'1 กุมภาพันธ์ 2568'});await row.waitFor();
+   assert.equal(await row.locator('td').nth(4).innerText(),'8 ชม.');
+   assert.equal(await row.locator('td').nth(5).innerText(),'2 ชม.');
+   assert.equal(await row.locator('td').nth(9).innerText(),'2 ชม.');
   }
   users.push({code,temp,password,page,expected});
  }
@@ -109,7 +109,7 @@ try {
  // Logout revokes the exact captured session, not just the browser cookie.
  const old=(await users[1].page.context().cookies()).find(c=>c.name==='payday_sid');
  await users[1].page.getByRole('button',{name:'ออกจากระบบ',exact:true}).click();
- await users[1].page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await users[1].page.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  const revoked=await fetch(`${base}/api/me/payroll`,{headers:{Cookie:`payday_sid=${old.value}`}});assert.equal(revoked.status,401);
  // Exercise reset and disable from the administrator's actual UI.
  await admin.getByRole('button',{name:'พนักงาน',exact:true}).click();

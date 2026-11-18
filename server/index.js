@@ -3,6 +3,7 @@ import { pool } from './db.js';
 import { registerPayrollRoutes } from './payroll.js';
 import { registerAuth, requireAdmin } from './auth.js';
 import { registerEmployeeLifecycle } from './employee-lifecycle.js';
+import { registerAttendanceRoutes } from './attendance.js';
 import { createWorkLog } from './work-logs.js';
 import { registerFrontend } from './frontend.js';
 
@@ -51,7 +52,7 @@ app.get('/api/employees', requireAdmin, async (req, res) => {
                 employee_code,
                 full_name,
                 pay_type,
-                pay_rate, is_active
+                pay_rate, is_active, employment_start_date::text, employment_end_date::text, auto_shift_type
             FROM public.employees
             ORDER BY employee_code
         `);
@@ -90,7 +91,7 @@ app.get('/api/employees/:id', requireAdmin, async (req, res) => {
                     employee_code,
                     full_name,
                     pay_type,
-                    pay_rate, is_active
+                    pay_rate, is_active, employment_start_date::text, employment_end_date::text, auto_shift_type
                 FROM public.employees
                 WHERE id = $1
             `,
@@ -165,7 +166,7 @@ app.post('/api/employees', requireAdmin, async (req, res) => {
                     employee_code,
                     full_name,
                     pay_type,
-                    pay_rate, is_active
+                    pay_rate, is_active, employment_start_date::text, employment_end_date::text, auto_shift_type
             `,
             [
                 employee_code.trim(),
@@ -256,7 +257,7 @@ app.put('/api/employees/:id', requireAdmin, async (req, res) => {
                     employee_code,
                     full_name,
                     pay_type,
-                    pay_rate, is_active
+                    pay_rate, is_active, employment_start_date::text, employment_end_date::text, auto_shift_type
             `,
             [
                 employee_code.trim(),
@@ -310,11 +311,11 @@ app.get('/api/work-logs', requireAdmin, async (req, res) => {
                 e.full_name,
                 w.work_date::text AS work_date,
                 w.shift_type,
-                w.wage_multiplier,
+                w.wage_multiplier, w.attendance_status, w.source, w.leave_paid,
                 w.regular_minutes,
                 w.overtime_minutes,
-                w.overtime_3x_minutes,
-                w.overtime_minutes - w.overtime_3x_minutes
+                w.overtime_3x_minutes, w.overtime_1x_minutes, w.overtime_2x_minutes,
+                w.overtime_minutes - w.overtime_3x_minutes - w.overtime_1x_minutes - w.overtime_2x_minutes
                     AS overtime_15_minutes,
                 w.meal_allowance
             FROM public.work_logs AS w
@@ -338,6 +339,7 @@ app.get('/api/work-logs', requireAdmin, async (req, res) => {
     }
 });
 
+registerAttendanceRoutes(app, pool, requireAdmin);
 registerPayrollRoutes(app, pool, requireAdmin);
 // API misses never fall through to React, including when the user is logged out.
 app.use('/api', (req, res) => res.status(404).json({ message: 'ไม่พบ API ที่เรียก' }));

@@ -7,7 +7,7 @@ const adminPassword=process.env.PAYDAY_TEST_ADMIN_PASSWORD;
 assert.ok(adminPassword,'Use tests/run-browser-tests.js to create isolated test credentials');
 async function adminLogin(p) {
  await p.goto(baseURL);
- await p.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await p.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  await p.getByLabel('ประเภทบัญชี',{exact:true}).selectOption('admin');
  await p.getByLabel('ชื่อผู้ดูแลระบบ',{exact:true}).fill('browser-admin');
  await p.getByLabel('รหัสผ่าน',{exact:true}).fill(adminPassword);
@@ -43,9 +43,13 @@ try {
    await page.getByLabel('วันที่ทำงาน').fill(date);
    await page.locator('select[name="shift_type"]').selectOption('night');
    await page.getByLabel('OT รวม',{exact:true}).fill('1');
-   await page.getByLabel('OT 3 เท่า',{exact:true}).fill('0.5');
+   await page.getByLabel('อัตรา OT',{exact:true}).selectOption('1.5');
    const [r] = await post('/api/work-logs',() => page.getByRole('button',{name:'บันทึกเวลาทำงาน',exact:true}).click());
    assert.equal(r.status(),201);
+   const work=(await r.json()).data;
+   const session=(await (await page.request.get(`${baseURL}/api/auth/session`)).json()).data;
+   const split=await page.request.patch(`${baseURL}/api/work-logs/${work.id}/overtime`,{headers:{'X-PayDay-Request':'1','X-CSRF-Token':session.csrf_token},data:{overtime_minutes:60,overtime_1x_minutes:0,overtime_2x_minutes:0,overtime_3x_minutes:30}});
+   assert.equal(split.status(),200);
    await page.getByRole('status').filter({hasText:'บันทึกเวลาทำงานเรียบร้อยแล้ว'}).waitFor();
   }
  }
@@ -92,7 +96,7 @@ try {
  await mobile.evaluate(() => document.fonts.ready);
  await mobile.screenshot({path:'/tmp/payday-browser/report-mobile.png',fullPage:true});
  assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),false);
- // Future test dates keep the original November/December payroll fixtures unchanged.
+ // Separate past dates keep the original November/December payroll fixtures unchanged.
  await page.getByRole('button',{name:'บันทึกการทำงาน',exact:true}).click();
  await page.locator('select[name="employee_id"]').selectOption({label:'UI002 — ทดสอบ UI002'});
  assert.equal(await page.getByLabel('เวลาปกติ',{exact:true}).inputValue(),'8 ชม.');
@@ -100,15 +104,14 @@ try {
  await page.getByLabel('OT รวม',{exact:true}).fill('-1');
  assert.equal(await page.getByLabel('OT รวม',{exact:true}).evaluate(e=>e.checkValidity()),false);
  await page.getByLabel('OT รวม',{exact:true}).fill('2');
- await page.getByLabel('OT 3 เท่า',{exact:true}).fill('3');
- assert.equal(await page.getByLabel('OT 3 เท่า',{exact:true}).evaluate(e=>e.checkValidity()),false);
+ await page.getByLabel('อัตรา OT',{exact:true}).selectOption('3');
  for(const [date,hours,triple,minutes,tripleMinutes,meal] of [
-  ['2027-02-01','2','0.25',120,15,'166.00'],
-  ['2027-02-02','1','0',60,0,'166.00'],
-  ['2027-02-03','0.25','0',15,0,'83.00']]) {
+  ['2025-02-01','2','3',120,120,'166.00'],
+  ['2025-02-02','1','1.5',60,0,'166.00'],
+  ['2025-02-03','0.25','2',15,0,'83.00']]) {
   await page.getByLabel('วันที่ทำงาน').fill(date);
   await page.getByLabel('OT รวม',{exact:true}).fill(hours);
-  await page.getByLabel('OT 3 เท่า',{exact:true}).fill(triple);
+  await page.getByLabel('อัตรา OT',{exact:true}).selectOption(triple);
   const [r]=await post('/api/work-logs',()=>page.getByRole('button',{name:'บันทึกเวลาทำงาน',exact:true}).click());
   assert.equal(r.status(),201);
   const body=r.request().postDataJSON();assert.equal(body.regular_minutes,480);
@@ -117,12 +120,12 @@ try {
  }
  await page.reload();
  await page.getByRole('button',{name:'บันทึกการทำงาน',exact:true}).click();
- const hoursRow=page.locator('tbody tr').filter({hasText:'1 กุมภาพันธ์ 2570'});
+ const hoursRow=page.locator('tbody tr').filter({hasText:'1 กุมภาพันธ์ 2568'});
  await hoursRow.waitFor();
- assert.equal(await hoursRow.locator('td').nth(3).innerText(),'8 ชม.');
- assert.equal(await hoursRow.locator('td').nth(4).innerText(),'2 ชม.');
- assert.equal(await hoursRow.locator('td').nth(5).innerText(),'0.25 ชม.');
- const persisted=(await (await page.request.get(`${baseURL}/api/work-logs`)).json()).data.find(r=>r.work_date==='2027-02-01');
+ assert.equal(await hoursRow.locator('td').nth(5).innerText(),'8 ชม.');
+ assert.equal(await hoursRow.locator('td').nth(6).innerText(),'2 ชม.');
+ assert.equal(await hoursRow.locator('td').nth(10).innerText(),'2 ชม.');
+ const persisted=(await (await page.request.get(`${baseURL}/api/work-logs`)).json()).data.find(r=>r.work_date==='2025-02-01');
  assert.equal(persisted.overtime_minutes,120);assert.equal(persisted.regular_minutes,480);
  assert.deepEqual(errors,[]);
  console.log('PASS browser: create/edit daily+monthly, duplicate employee, 16 boundary work logs, duplicate work log, November preview, save, reload frozen report, mobile layout, no page errors');

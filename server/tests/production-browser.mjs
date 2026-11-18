@@ -9,7 +9,7 @@ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '
 const errors=[];
 async function pageFor(){const context=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1440,height:1000}});const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));return page;}
 async function login(page,login,password,role='employee'){
- await page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await page.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  await page.getByLabel('ประเภทบัญชี',{exact:true}).selectOption(role);
  await page.getByLabel(role==='admin'?'ชื่อผู้ดูแลระบบ':'รหัสพนักงาน',{exact:true}).fill(login);
  await page.getByLabel('รหัสผ่าน',{exact:true}).fill(password);
@@ -56,7 +56,7 @@ try{
  assert.equal(work.status(),201);assert.equal(new URL(work.url()).origin,new URL(base).origin);
  const oldCookie=(await user.context().cookies()).find(c=>c.name==='payday_sid');assert.equal(oldCookie.secure,true);assert.equal(oldCookie.httpOnly,true);
  await user.getByRole('button',{name:'ออกจากระบบ',exact:true}).click();
- await user.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
+ await user.getByRole('heading',{name:/^เข้าสู่ระบบ/}).waitFor();
  const old=await user.request.get(base+'/api/me/payroll',{headers:{Cookie:`payday_sid=${oldCookie.value}`}});assert.equal(old.status(),401);
  assert.equal((await get(admin,'/api/unknown')).status,404);
  assert.deepEqual(errors,[]);

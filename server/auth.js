@@ -180,8 +180,8 @@ export function registerAuth(app,pool) {
   app.get('/api/me/work-logs',requireEmployee,async(req,res)=>{
     const month=req.query.month;
     if(typeof month!=='string' || !/^(20[0-9]{2}|21[0-9]{2})-(0[1-9]|1[0-2])$/.test(month)) throw failure(400,'กรุณาเลือกเดือนที่ถูกต้อง');
-    const rows=(await pool.query(`SELECT id,employee_id,work_date::text,wage_multiplier,shift_type,regular_minutes,
-      overtime_minutes,overtime_3x_minutes,meal_allowance FROM public.work_logs
+    const rows=(await pool.query(`SELECT id,employee_id,work_date::text,wage_multiplier,shift_type,regular_minutes,attendance_status,source,leave_paid,
+      overtime_minutes,overtime_3x_minutes,overtime_1x_minutes,overtime_2x_minutes,meal_allowance FROM public.work_logs
       WHERE employee_id=$1 AND work_date>=$2::date AND work_date<($2::date+interval '1 month')
       ORDER BY work_date DESC,id DESC`,[req.auth.employee_id,`${month}-01`])).rows;
     res.json({data:rows});
@@ -189,7 +189,7 @@ export function registerAuth(app,pool) {
   const ownPayrollSQL=`SELECT p.id,p.period_name,p.payment_date::text,p.start_date::text,p.end_date::text,
     p.overtime_start_date::text,p.overtime_end_date::text,p.published_at,
     i.employee_id,i.employee_code_snapshot AS employee_code,i.full_name_snapshot AS full_name,
-    i.pay_type_used,i.pay_rate_used,i.base_pay,i.overtime_15_pay,i.overtime_3_pay,i.meal_pay,i.shift_pay,i.gross_pay,i.recorded_days,i.overtime_15_minutes,i.overtime_3_minutes,i.overtime_total_minutes,COALESCE(i.overtime_total_pay,i.overtime_15_pay+i.overtime_3_pay) AS overtime_total_pay
+    i.pay_type_used,i.pay_rate_used,i.base_pay,i.overtime_15_pay,i.overtime_3_pay,i.meal_pay,i.shift_pay,i.gross_pay,i.recorded_days,i.sick_days,i.personal_days,i.overtime_1_minutes,i.overtime_2_minutes,i.overtime_1_pay,i.overtime_2_pay,i.overtime_15_minutes,i.overtime_3_minutes,i.overtime_total_minutes,COALESCE(i.overtime_total_pay,i.overtime_15_pay+i.overtime_3_pay) AS overtime_total_pay
     FROM public.payroll_periods p JOIN public.payroll_items i ON i.payroll_period_id=p.id
     WHERE i.employee_id=$1 AND p.saved_at IS NOT NULL AND p.published_at IS NOT NULL`;
   app.get('/api/me/payroll',requireEmployee,async(req,res)=>{

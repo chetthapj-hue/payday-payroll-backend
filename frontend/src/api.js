@@ -63,19 +63,41 @@ export function payMonthForWorkDate(date) {
     const [year, month, day] = date.split('-').map(Number);
     return new Date(Date.UTC(year, month - 1 + (day >= 17 ? 1 : 0), 1)).toISOString().slice(0, 7);
 }
-export function workTimePayload(form) {
+export function overtimePayload(form) {
     const overtime_minutes = hoursToMinutes(form.overtime_hours);
-    const overtime_3x_minutes = hoursToMinutes(form.overtime_3x_hours);
-    if (Number(form.overtime_3x_hours) > Number(form.overtime_hours)) throw new Error('OT 3 เท่าต้องไม่เกิน OT รวม');
     if (Number(form.overtime_hours) > 16) throw new Error('เวลาปกติและ OT รวมต้องไม่เกิน 24 ชม. ต่อวัน');
-    return { wage_multiplier: isWeekend(form.work_date) ? Number(form.wage_multiplier ?? 1) : 1, work_date: form.work_date, regular_minutes: 480, overtime_minutes, overtime_3x_minutes, shift_type: form.shift_type };
+    const single = form.overtime_rate && form.overtime_rate !== 'split';
+    if (single && !['1', '1.5', '2', '3'].includes(form.overtime_rate)) throw new Error('กรุณาเลือกอัตรา OT');
+    const component = rate => single ? (form.overtime_rate === String(rate) ? overtime_minutes : 0) : hoursToMinutes(form[`overtime_${rate}x_hours`] ?? 0);
+    const overtime_1x_minutes = component(1), overtime_2x_minutes = component(2), overtime_3x_minutes = component(3);
+    if (!single && [1, 2, 3].reduce((sum, rate) => sum + Number(form[`overtime_${rate}x_hours`] ?? 0), 0) > Number(form.overtime_hours)) throw new Error('ส่วนแบ่ง OT ต้องไม่เกิน OT รวม');
+    if (overtime_1x_minutes + overtime_2x_minutes + overtime_3x_minutes > overtime_minutes) throw new Error('ส่วนแบ่ง OT ต้องไม่เกิน OT รวม');
+    return { overtime_minutes, overtime_1x_minutes, overtime_2x_minutes, overtime_3x_minutes };
+}
+export function overtimeForm(log) {
+    const total = log.overtime_minutes;
+    const components = [[1, log.overtime_1x_minutes ?? 0], [2, log.overtime_2x_minutes ?? 0], [3, log.overtime_3x_minutes ?? 0]];
+    components.push([1.5, total - components.reduce((sum, [, minutes]) => sum + minutes, 0)]);
+    const rates = components.filter(([, minutes]) => minutes > 0);
+    return { overtime_hours: String(total / 60), overtime_rate: rates.length > 1 ? 'split' : String(rates[0]?.[0] ?? 1.5),
+        overtime_1x_hours: String((log.overtime_1x_minutes ?? 0) / 60), overtime_2x_hours: String((log.overtime_2x_minutes ?? 0) / 60), overtime_3x_hours: String((log.overtime_3x_minutes ?? 0) / 60) };
+}
+export function workTimePayload(form, { holidayDates = [] } = {}) {
+    return { wage_multiplier: (isWeekend(form.work_date) || holidayDates.includes(form.work_date)) ? Number(form.wage_multiplier ?? 1) : 1,
+        work_date: form.work_date, regular_minutes: 480, ...overtimePayload(form), shift_type: form.shift_type };
 }
 
 // Date inputs are Thai calendar dates; use UTC only to read their weekday without host timezone shifts.
 export const isWeekend = date => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
 export const payrollMetrics = [
     ['recorded_days', 'จำนวนวันทำงาน', 'days'],
+    ['sick_days', 'วันลาป่วย', 'days'],
+    ['personal_days', 'วันลากิจ', 'days'],
     ['overtime_total_minutes', 'ชั่วโมง OT รวม', 'hours'],
+    ['overtime_1_minutes', 'ชั่วโมง OT 1 เท่า', 'hours'],
+    ['overtime_2_minutes', 'ชั่วโมง OT 2 เท่า', 'hours'],
+    ['overtime_1_pay', 'เงิน OT 1 เท่า', 'money'],
+    ['overtime_2_pay', 'เงิน OT 2 เท่า', 'money'],
     ['overtime_15_minutes', 'ชั่วโมง OT 1.5 เท่า', 'hours'],
     ['overtime_3_minutes', 'ชั่วโมง OT 3 เท่า', 'hours'],
     ['overtime_total_pay', 'เงิน OT รวม', 'money'],
@@ -86,3 +108,5 @@ export function metricValue(value, type) {
     if (type === 'days') return `${value} วัน`;
     return `${money(value)} บาท`;
 }
+
+export const attendanceLabel = log => log.attendance_status === 'sick' ? `ลาป่วย (${log.leave_paid ? 'ได้เงิน' : 'ไม่ได้เงิน'})` : log.attendance_status === 'personal' ? `ลากิจ (${log.leave_paid ? 'ได้เงิน' : 'ไม่ได้เงิน'})` : log.source === 'auto' ? 'ทำงาน (อัตโนมัติ)' : 'ทำงาน';

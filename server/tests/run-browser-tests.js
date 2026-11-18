@@ -23,7 +23,12 @@ try {
  const cookie=login.headers.get('set-cookie').split(';')[0];
  const health=await (await fetch(`${backend}/api/health/db`,{headers:{Cookie:cookie}})).json();
  if(health.database!==name) throw new Error('Browser target database mismatch');
- const files=['browser.mjs','auth-browser.mjs','employee-lifecycle-browser.mjs','self-service-browser.mjs'];
+ let files=['browser.mjs','auth-browser.mjs','employee-lifecycle-browser.mjs','self-service-browser.mjs','attendance-browser.mjs'];
+ if(process.env.PAYDAY_BROWSER_TESTS) {
+  const requested=process.env.PAYDAY_BROWSER_TESTS.split(',');
+  if(requested.some(file=>!files.includes(file)))throw new Error('Unknown browser test');
+  files=requested;
+ }
  if(process.env.PAYDAY_HTTPS_TEST_BASE_URL)files.push('production-browser.mjs');
  for(const file of files){
   const r=run([`tests/${file}`],{stdio:'inherit'});if(r.status!==0) {process.exitCode=r.status || 1;break;}

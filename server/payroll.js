@@ -18,30 +18,39 @@ export function periodDates(month) {
 // Keep PostgreSQL numeric arithmetic and round each component before gross pay.
 const calculationSQL = `
 WITH work AS (
- SELECT employee_id, COUNT(DISTINCT work_date) AS days, SUM(wage_multiplier) AS paid_days, SUM(meal_allowance) AS meal,
- SUM(CASE shift_type WHEN 'night' THEN 150.00 ELSE 0.00 END) AS shift
+ SELECT employee_id, COUNT(DISTINCT work_date) FILTER (WHERE attendance_status='work') AS days,
+ COUNT(*) FILTER (WHERE attendance_status='sick')::integer AS sick_days,
+ COUNT(*) FILTER (WHERE attendance_status='personal')::integer AS personal_days,
+ SUM(CASE WHEN attendance_status='work' THEN wage_multiplier ELSE leave_wage_fraction END) AS paid_days,
+ SUM(COALESCE(leave_monthly_deduction_fraction,0)) AS monthly_deductions, SUM(meal_allowance) AS meal,
+ SUM(CASE WHEN attendance_status='work' AND shift_type='night' THEN 150.00 ELSE 0.00 END) AS shift
  FROM public.work_logs WHERE work_date BETWEEN $1::date AND $2::date AND ($5::integer IS NULL OR employee_id=$5) GROUP BY employee_id
 ), overtime AS (
- SELECT employee_id, SUM(overtime_minutes - overtime_3x_minutes) AS ot15,
+ SELECT employee_id, SUM(overtime_minutes - overtime_3x_minutes - overtime_1x_minutes - overtime_2x_minutes) AS ot15,
+ SUM(overtime_1x_minutes) AS ot1,SUM(overtime_2x_minutes) AS ot2,
  SUM(overtime_3x_minutes) AS ot3 FROM public.work_logs
  WHERE work_date BETWEEN $3::date AND $4::date AND ($5::integer IS NULL OR employee_id=$5) GROUP BY employee_id
 ), amounts AS (
  SELECT e.id AS employee_id, e.employee_code, e.full_name,
  e.pay_type AS pay_type_used, e.pay_rate AS pay_rate_used, COALESCE(w.days,0)::integer AS recorded_days,
- ROUND(CASE e.pay_type WHEN 'monthly' THEN e.pay_rate ELSE e.pay_rate * COALESCE(w.paid_days,0) END,2) AS base_pay,
+ COALESCE(w.sick_days,0)::integer AS sick_days,COALESCE(w.personal_days,0)::integer AS personal_days,
+ ROUND(CASE e.pay_type WHEN 'monthly' THEN e.pay_rate * GREATEST(0,1-COALESCE(w.monthly_deductions,0)) ELSE e.pay_rate * COALESCE(w.paid_days,0) END,2) AS base_pay,
  ROUND((CASE e.pay_type WHEN 'daily' THEN e.pay_rate / 8 ELSE e.pay_rate / 30 / 8 END)
  * 1.5 * COALESCE(o.ot15,0) / 60,2) AS overtime_15_pay,
  ROUND((CASE e.pay_type WHEN 'daily' THEN e.pay_rate / 8 ELSE e.pay_rate / 30 / 8 END)
  * 3 * COALESCE(o.ot3,0) / 60,2) AS overtime_3_pay,
+ ROUND((CASE e.pay_type WHEN 'daily' THEN e.pay_rate / 8 ELSE e.pay_rate / 30 / 8 END) * COALESCE(o.ot1,0) / 60,2) AS overtime_1_pay,
+ ROUND((CASE e.pay_type WHEN 'daily' THEN e.pay_rate / 8 ELSE e.pay_rate / 30 / 8 END) * 2 * COALESCE(o.ot2,0) / 60,2) AS overtime_2_pay,
+ COALESCE(o.ot1,0)::integer AS overtime_1_minutes,COALESCE(o.ot2,0)::integer AS overtime_2_minutes,
  COALESCE(o.ot15,0)::integer AS overtime_15_minutes,
  COALESCE(o.ot3,0)::integer AS overtime_3_minutes,
- (COALESCE(o.ot15,0)+COALESCE(o.ot3,0))::integer AS overtime_total_minutes,
+ (COALESCE(o.ot1,0)+COALESCE(o.ot2,0)+COALESCE(o.ot15,0)+COALESCE(o.ot3,0))::integer AS overtime_total_minutes,
  COALESCE(w.meal,0.00) AS meal_pay, COALESCE(w.shift,0.00) AS shift_pay
  FROM public.employees e LEFT JOIN work w ON w.employee_id=e.id
  LEFT JOIN overtime o ON o.employee_id=e.id
  WHERE ($5::integer IS NULL OR e.id=$5)
 )
-SELECT *, overtime_15_pay + overtime_3_pay AS overtime_total_pay, base_pay + overtime_15_pay + overtime_3_pay + meal_pay + shift_pay AS gross_pay
+SELECT *, overtime_1_pay + overtime_2_pay + overtime_15_pay + overtime_3_pay AS overtime_total_pay, base_pay + overtime_1_pay + overtime_2_pay + overtime_15_pay + overtime_3_pay + meal_pay + shift_pay AS gross_pay
 FROM amounts ORDER BY employee_code`;
 
 export async function calculate(db, period, employeeId = null) {
@@ -49,7 +58,8 @@ export async function calculate(db, period, employeeId = null) {
   const invalid = await db.query(`SELECT id, work_date::text AS work_date FROM public.work_logs
     WHERE (work_date BETWEEN $1::date AND $2::date OR work_date BETWEEN $3::date AND $4::date)
     AND ($5::integer IS NULL OR employee_id=$5)
-    AND (regular_minutes<>480 OR shift_type IS NULL OR overtime_3x_minutes IS NULL)
+    AND ((attendance_status='work' AND (regular_minutes<>480 OR shift_type IS NULL OR overtime_3x_minutes IS NULL))
+ OR (attendance_status<>'work' AND (regular_minutes<>0 OR overtime_minutes<>0 OR overtime_3x_minutes<>0 OR overtime_1x_minutes<>0 OR overtime_2x_minutes<>0 OR leave_wage_fraction IS NULL OR leave_monthly_deduction_fraction IS NULL)))
     ORDER BY id LIMIT 10`, values);
   if (invalid.rows.length) {
     throw Object.assign(new Error(`คำนวณไม่ได้: บันทึกเวลา ${invalid.rows.map(r => r.id).join(', ')} มีวันไม่เต็มหรือข้อมูลกะ/OT ไม่ครบ ต้องยืนยันกติกาก่อน`), { status: 422 });
@@ -65,7 +75,7 @@ async function report(db, id) {
   if (!p) throw Object.assign(new Error('ไม่พบรายงานงวดที่บันทึกแล้ว'), { status: 404 });
   const rows = (await db.query(`SELECT employee_id, employee_code_snapshot AS employee_code,
     full_name_snapshot AS full_name,pay_type_used,pay_rate_used,base_pay,overtime_15_pay,
-    overtime_3_pay,meal_pay,shift_pay,gross_pay,recorded_days,overtime_15_minutes,
+    overtime_3_pay,meal_pay,shift_pay,gross_pay,recorded_days,sick_days,personal_days,overtime_1_minutes,overtime_2_minutes,overtime_1_pay,overtime_2_pay,overtime_15_minutes,
     overtime_3_minutes,overtime_total_minutes,
     COALESCE(overtime_total_pay,overtime_15_pay+overtime_3_pay) AS overtime_total_pay FROM public.payroll_items
     WHERE payroll_period_id=$1 ORDER BY employee_code_snapshot`, [id])).rows;
@@ -120,11 +130,11 @@ export function registerPayrollRoutes(app, pool, requireAdmin) {
         await db.query(`INSERT INTO public.payroll_items
           (payroll_period_id,employee_id,employee_code_snapshot,full_name_snapshot,
           pay_type_used,pay_rate_used,base_pay,overtime_15_pay,overtime_3_pay,meal_pay,shift_pay,
-          recorded_days,overtime_15_minutes,overtime_3_minutes,overtime_total_minutes,overtime_total_pay)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          recorded_days,overtime_15_minutes,overtime_3_minutes,overtime_total_minutes,overtime_total_pay,sick_days,personal_days,overtime_1_minutes,overtime_2_minutes,overtime_1_pay,overtime_2_pay)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
           [p.id,r.employee_id,r.employee_code,r.full_name,r.pay_type_used,r.pay_rate_used,
             r.base_pay,r.overtime_15_pay,r.overtime_3_pay,r.meal_pay,r.shift_pay,r.recorded_days,r.overtime_15_minutes,r.overtime_3_minutes,
-            r.overtime_total_minutes,r.overtime_total_pay]);
+            r.overtime_total_minutes,r.overtime_total_pay,r.sick_days,r.personal_days,r.overtime_1_minutes,r.overtime_2_minutes,r.overtime_1_pay,r.overtime_2_pay]);
       }
       await db.query('UPDATE public.payroll_periods SET saved_at=CURRENT_TIMESTAMP WHERE id=$1', [p.id]);
       const data = await report(db, p.id);

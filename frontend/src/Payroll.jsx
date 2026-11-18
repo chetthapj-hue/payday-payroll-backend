@@ -70,7 +70,7 @@ export default function Payroll({ reportsOnly }) {
             </div>
             <div className="table-wrap"><table><thead><tr><th>รหัส</th><th>ชื่อพนักงาน</th><th>ประเภท / อัตรา</th>{payrollMetrics.map(([key, title]) => <th key={key}>{title}</th>)}{columns.map(([key, title]) => <th key={key}>{title}</th>)}</tr></thead><tbody>
                 {data.rows.map(row => <tr key={row.employee_id}><td>{row.employee_code}</td><td>{row.full_name}</td><td>{row.pay_type_used === 'daily' ? 'รายวัน' : 'รายเดือน'} / {money(row.pay_rate_used)}</td>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(row[key], type)}</td>)}{columns.map(([key]) => <td className="text-right tabular-nums" key={key}>{money(row[key])}</td>)}</tr>)}
-                {!data.rows.length && <tr><td colSpan="14">ไม่มีพนักงานในงวดนี้</td></tr>}
+                {!data.rows.length && <tr><td colSpan={3 + payrollMetrics.length + columns.length}>ไม่มีพนักงานในงวดนี้</td></tr>}
             </tbody><tfoot><tr><th colSpan="3">รวมทั้งทีม</th>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(data.rows.some(row => row[key] == null) ? null : data.rows.reduce((sum, row) => sum + Number(row[key]), 0), type)}</td>)}{columns.map(([key]) => <td className="text-right font-semibold tabular-nums" key={key}>{money(data.rows.reduce((sum, row) => sum + Number(row[key]), 0))}</td>)}</tr></tfoot></table></div>
             {!data.saved && <button className="primary" disabled={busy || !data.rows.length} onClick={save}>ตรวจยอดแล้ว — บันทึกงวดนี้</button>}
             {data.saved && !data.period.published_at && <button className="primary" disabled={busy} onClick={publish}>เผยแพร่งวด</button>}

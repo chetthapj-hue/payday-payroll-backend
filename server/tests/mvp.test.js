@@ -21,6 +21,8 @@ before(async () => {
   await pool.query(await readFile(new URL('../migrations/002_auth.sql', import.meta.url), 'utf8'));
   await pool.query(await readFile(new URL('../migrations/003_employee_status.sql', import.meta.url), 'utf8'));
   await pool.query(await readFile(new URL('../migrations/004_weekend_payroll_metrics.sql', import.meta.url), 'utf8'));
+  await pool.query(await readFile(new URL('../migrations/005_attendance.sql', import.meta.url), 'utf8'));
+  await pool.query(await readFile(new URL('../migrations/006_premium_rates.sql', import.meta.url), 'utf8'));
   server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}/api`;
@@ -161,7 +163,7 @@ test('weekend daily wage, distinct days, monthly unchanged, weekday and future r
     overtime_minutes:120, overtime_3x_minutes:30, shift_type:'night', wage_multiplier:2 };
   assert.equal((await call('/work-logs', body)).status,201);
   assert.equal((await call('/work-logs', {...body, work_date:'2025-10-20'})).status,400);
-  assert.equal((await call('/work-logs', {...body, wage_multiplier:3})).status,400);
+  assert.equal((await call('/work-logs', {...body, wage_multiplier:4})).status,400);
   assert.equal((await call('/work-logs', {...body, work_date:'2199-01-01', wage_multiplier:1})).status,400);
   const row=(await call('/payroll/preview?month=2025-11')).data.rows[0];
   assert.equal(row.base_pay,'800.00'); assert.equal(row.recorded_days,1);

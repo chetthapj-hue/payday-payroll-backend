@@ -73,3 +73,5 @@ npm test
 `npm run test:browser` เรียก Chrome tests เดิม ใช้ TEST_DATABASE_URL และ PLAYWRIGHT_MODULE ตาม [server/AUTH.md](server/AUTH.md) เปลี่ยน PAYDAY_TEST_BASE_URL เป็น Express production URL ได้ และเพิ่ม PAYDAY_HTTPS_TEST_BASE_URL เพื่อทดสอบ HTTPS ด้วย [ขั้นตอนทดสอบ](DEPLOY_TESTING.md) runner ล้างข้อมูลเฉพาะฐานทดสอบ ห้ามใช้ฐานจริง
 
 คู่มือฟีเจอร์: [บัญชี/สิทธิ์](server/AUTH.md), [ลงเวลาตนเอง/ยอดสะสม](server/SELF_SERVICE.md), [MVP/สูตร](server/README.md)
+
+ฟีเจอร์แก้ OT, ลาป่วย/ลากิจได้เงินหรือไม่ได้เงิน และงานวันธรรมดาอัตโนมัติ (ปิดเริ่มต้น): [คู่มือและขั้นตอนเปิดใช้](server/ATTENDANCE.md)
