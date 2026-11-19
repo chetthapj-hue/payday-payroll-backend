@@ -30,7 +30,7 @@ export default function AttendanceActions({ log, employee = false, onSaved }) {
             setEditing(false); await onSaved(row);
         } catch (e) { setError(e.message); } finally { setBusy(false); }
     }
-    if (!isLeave && ((log.overtime_1x_minutes ?? 0) > 0 || (log.overtime_2x_minutes ?? 0) > 0)) return <p role="note" className="text-amber-800">รายการเดิมมี OT 1/2 เท่า เก็บไว้ตามเดิม ต้องตรวจทานก่อนแก้ไขอัตราหรือชั่วโมง</p>;
+    if (!isLeave && ((log.overtime_1x_minutes ?? 0) > 0 || (log.overtime_2x_minutes ?? 0) > 0)) return <p role="note" className="text-amber-800">รายการเดิมมี OT อัตราอื่น เก็บไว้ตามเดิม ต้องตรวจทานก่อนแก้ไขอัตราหรือชั่วโมง</p>;
     return <div className="min-w-40 space-y-2">
         <button type="button" onClick={() => { if (!editing) { setForm(overtimeForm(log)); setType(log.attendance_status === 'personal' ? 'personal' : 'sick'); setPaid(Boolean(log.leave_paid)); } setEditing(v => !v); setError(''); }}>{isLeave ? 'แก้ไขวันลา' : 'แก้ไข OT'}</button>
         {editing && <form onSubmit={save} aria-label={`แก้ไข ${thaiDate(log.work_date)}`}><fieldset disabled={busy} className="space-y-2">

@@ -92,6 +92,7 @@ try{
  assert.deepEqual((await api(page,`/me/payroll/${id}`)).data,published);
  await page.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
  assert.equal(await page.getByLabel('เดือนที่ทำงาน',{exact:true}).inputValue(),'2025-09');
+ await page.getByRole('cell',{name:'18 กันยายน 2568',exact:true}).waitFor();
  assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'เงินเดือนของฉัน',exact:true}).click();
  await page.getByLabel('งวดเงินเดือนของฉัน',{exact:true}).selectOption(String(id));

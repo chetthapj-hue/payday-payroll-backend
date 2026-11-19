@@ -124,7 +124,7 @@ try {
  await hoursRow.waitFor();
  assert.equal(await hoursRow.locator('td').nth(5).innerText(),'8 ชม.');
  assert.equal(await hoursRow.locator('td').nth(6).innerText(),'2 ชม.');
- assert.equal(await hoursRow.locator('td').nth(10).innerText(),'2 ชม.');
+ assert.equal(await hoursRow.locator('td').nth(8).innerText(),'2 ชม.');
  const persisted=(await (await page.request.get(`${baseURL}/api/work-logs`)).json()).data.find(r=>r.work_date==='2025-02-01');
  assert.equal(persisted.overtime_minutes,120);assert.equal(persisted.regular_minutes,480);
  assert.deepEqual(errors,[]);

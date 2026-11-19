@@ -1,3 +1,5 @@
+import LegacyOvertimeNotice from './LegacyOvertimeNotice';
+import { workLogOvertime15Minutes } from './api';
 import AttendanceActions from './AttendanceActions';
 import LeaveForm from './LeaveForm';
 import AttendanceSummary from './AttendanceSummary';
@@ -27,6 +29,7 @@ export default function EmployeeDashboard({ user }) {
         return () => controller.abort();
     }, [tab]);
     useEffect(() => {
+        if (tab !== 'work') return;
         const controller = new AbortController();
         // Month selection remounts this request without exposing another employee selector.
         api(`/me/work-logs?month=${month}`, { signal: controller.signal }).then(rows => {
@@ -34,7 +37,7 @@ export default function EmployeeDashboard({ user }) {
         }).catch(e => { if (!controller.signal.aborted) setError(e.message); })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
-    }, [month, revision]);
+    }, [month, revision, tab]);
     function handleWorkCreated(row) {
         setMonth(row.work_date.slice(0, 7)); setLoading(true);
         setAccruedMonth(payMonthForWorkDate(row.work_date));
@@ -53,9 +56,10 @@ export default function EmployeeDashboard({ user }) {
         {tab === 'work' && <section className="space-y-4">
             <label className="block max-w-xs">เดือนที่ทำงาน<input required type="month" min="2000-01" max="2199-12" value={month} onChange={e => { if (e.target.value) { setMonth(e.target.value); setLoading(true); setError(''); setLogs([]); } }} /></label>
             <AttendanceSummary logs={logs} />
-            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'สถานะ', 'กะ', 'ค่าแรงที่เลือก', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 1 เท่า (ชั่วโมง)', 'OT 1.5 เท่า (ชั่วโมง)', 'OT 2 เท่า (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร', 'แก้ไข'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
-                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{attendanceLabel(log)}</td><td>{log.attendance_status && log.attendance_status !== 'work' ? '—' : log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_1x_minutes ?? 0)}</td><td>{workHours(log.overtime_minutes - (log.overtime_1x_minutes ?? 0) - (log.overtime_2x_minutes ?? 0) - log.overtime_3x_minutes)}</td><td>{workHours(log.overtime_2x_minutes ?? 0)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td><td><AttendanceActions log={log} employee onSaved={handleWorkCreated} /></td></tr>)}
-                {!logs.length && <tr><td colSpan="12">ไม่มีประวัติในเดือนที่เลือกว่ะ</td></tr>}
+            <LegacyOvertimeNotice rows={logs} workLogs />
+            {loading ? <p role="status">กำลังโหลดประวัติ…</p> : <div className="table-wrap"><table><thead><tr>{['วันที่ทำงาน', 'สถานะ', 'กะ', 'ค่าแรงที่เลือก', 'เวลาปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 1.5 เท่า (ชั่วโมง)', 'OT 3.0 เท่า (ชั่วโมง)', 'ค่าอาหาร', 'แก้ไข'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
+                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{attendanceLabel(log)}</td><td>{log.attendance_status && log.attendance_status !== 'work' ? '—' : log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(workLogOvertime15Minutes(log))}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td><td><AttendanceActions log={log} employee onSaved={handleWorkCreated} /></td></tr>)}
+                {!logs.length && <tr><td colSpan="10">ไม่มีประวัติในเดือนที่เลือกว่ะ</td></tr>}
             </tbody></table></div>}
         </section>}
         {tab === 'payroll' && <section className="space-y-4">
@@ -72,7 +76,7 @@ export default function EmployeeDashboard({ user }) {
                 </div>
                 <PayrollMetrics row={selected} />
                 <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {[['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']].map(([key, label]) => <div key={key} className="rounded-2xl border border-slate-200 bg-white p-6"><dt className="text-slate-600">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{money(selected[key])} บาท</dd></div>)}
+                    {[['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3.0 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']].map(([key, label]) => <div key={key} className="rounded-2xl border border-slate-200 bg-white p-6"><dt className="text-slate-600">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{money(selected[key])} บาท</dd></div>)}
                 </dl>
                 <p className="text-sm text-slate-500">ยอดจากรายงานที่บันทึกและเผยแพร่แล้ว การแก้ข้อมูลปัจจุบันไม่เปลี่ยนยอดงวดนี้</p>
             </>}

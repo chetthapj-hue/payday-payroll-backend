@@ -1,3 +1,5 @@
+import LegacyOvertimeNotice from './LegacyOvertimeNotice';
+import { workLogOvertime15Minutes } from './api';
 import { workingMealAllowance } from '../../shared/meal-allowance.js';
 import OvertimeFields from './OvertimeFields';
 import AttendanceActions from './AttendanceActions';
@@ -95,10 +97,11 @@ export default function WorkLogs({ employees }) {
             <button disabled={loading} className="primary self-end">ค้นประวัติ</button>
         </form>
         <AttendanceSummary logs={logs} />
+        <LegacyOvertimeNotice rows={logs} workLogs />
         <div className="table-wrap"><h2 className="p-4 font-semibold">รายการล่าสุด 100 รายการ</h2>
-            {loading ? <p role="status" className="p-4">กำลังโหลด…</p> : <table><thead><tr>{['วันที่', 'พนักงาน', 'สถานะ', 'กะ', 'ค่าแรงที่เลือก', 'ปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 1 เท่า (ชั่วโมง)', 'OT 1.5 เท่า (ชั่วโมง)', 'OT 2 เท่า (ชั่วโมง)', 'OT 3 เท่า (ชั่วโมง)', 'ค่าอาหาร', 'แก้ไข'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>
-                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.employee_code} {log.full_name}</td><td>{attendanceLabel(log)}</td><td>{log.attendance_status && log.attendance_status !== 'work' ? '—' : log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(log.overtime_1x_minutes ?? 0)}</td><td>{workHours(log.overtime_minutes - (log.overtime_1x_minutes ?? 0) - (log.overtime_2x_minutes ?? 0) - log.overtime_3x_minutes)}</td><td>{workHours(log.overtime_2x_minutes ?? 0)}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td><td><AttendanceActions log={log} onSaved={handleSaved} /></td></tr>)}
-                {!logs.length && <tr><td colSpan="13">ยังไม่มีบันทึก</td></tr>}
+            {loading ? <p role="status" className="p-4">กำลังโหลด…</p> : <table><thead><tr>{['วันที่', 'พนักงาน', 'สถานะ', 'กะ', 'ค่าแรงที่เลือก', 'ปกติ (ชั่วโมง)', 'OT รวม (ชั่วโมง)', 'OT 1.5 เท่า (ชั่วโมง)', 'OT 3.0 เท่า (ชั่วโมง)', 'ค่าอาหาร', 'แก้ไข'].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>
+                {logs.map(log => <tr key={log.id}><td>{thaiDate(log.work_date)}</td><td>{log.employee_code} {log.full_name}</td><td>{attendanceLabel(log)}</td><td>{log.attendance_status && log.attendance_status !== 'work' ? '—' : log.shift_type === 'night' ? 'กลางคืน' : 'กลางวัน'}</td><td>{log.wage_multiplier ?? 1} เท่า</td><td>{workHours(log.regular_minutes)}</td><td>{workHours(log.overtime_minutes)}</td><td>{workHours(workLogOvertime15Minutes(log))}</td><td>{workHours(log.overtime_3x_minutes)}</td><td>{money(log.meal_allowance)}</td><td><AttendanceActions log={log} onSaved={handleSaved} /></td></tr>)}
+                {!logs.length && <tr><td colSpan="11">ยังไม่มีบันทึก</td></tr>}
             </tbody></table>}
         </div>
     </section>;

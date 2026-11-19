@@ -1,8 +1,9 @@
+import LegacyOvertimeNotice from './LegacyOvertimeNotice';
 import { MEAL_POLICY_NOTICE } from '../../shared/meal-allowance.js';
 import { useEffect, useState } from 'react';
 import { api, money, thaiDate, payrollMetrics, metricValue } from './api';
 
-const columns = [['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']];
+const columns = [['base_pay', 'ค่าจ้างปกติ'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3.0 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวม']];
 export default function Payroll({ reportsOnly }) {
     const [month, setMonth] = useState(() => {
         const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).formatToParts(new Date());
@@ -70,6 +71,7 @@ export default function Payroll({ reportsOnly }) {
                 <p className="text-sm">รวมวันต้นและวันท้าย ค่าอาหารใช้รอบ 17–16 รวมส่วนเพิ่ม OT ตามกติกาของงวด โดยไม่บวก OT 3 เท่าซ้ำ</p>
             </div>
             {!data.saved && <p role="note" className="rounded-xl bg-amber-50 p-4">{MEAL_POLICY_NOTICE}</p>}
+            <LegacyOvertimeNotice rows={data.rows} />
             <div className="table-wrap"><table><thead><tr><th>รหัส</th><th>ชื่อพนักงาน</th><th>ประเภท / อัตรา</th>{payrollMetrics.map(([key, title]) => <th key={key}>{title}</th>)}{columns.map(([key, title]) => <th key={key}>{title}</th>)}</tr></thead><tbody>
                 {data.rows.map(row => <tr key={row.employee_id}><td>{row.employee_code}</td><td>{row.full_name}</td><td>{row.pay_type_used === 'daily' ? 'รายวัน' : 'รายเดือน'} / {money(row.pay_rate_used)}</td>{payrollMetrics.map(([key, , type]) => <td key={key}>{metricValue(row[key], type)}</td>)}{columns.map(([key]) => <td className="text-right tabular-nums" key={key}>{money(row[key])}</td>)}</tr>)}
                 {!data.rows.length && <tr><td colSpan={3 + payrollMetrics.length + columns.length}>ไม่มีพนักงานในงวดนี้</td></tr>}

@@ -34,7 +34,7 @@ export default function AccruedIncome({ month, onMonthChange }) {
             <p role="note" className="rounded-xl bg-amber-50 p-4">{MEAL_POLICY_NOTICE}</p>
             <PayrollMetrics row={data.row} />
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[['base_pay', 'ค่าจ้างปกติสะสม'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวมสะสม']].map(([key, label]) => <div key={key} className="rounded-2xl border border-slate-200 bg-white p-6"><dt className="text-slate-600">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{money(data.row[key])} บาท</dd></div>)}
+                {[['base_pay', 'ค่าจ้างปกติสะสม'], ['overtime_15_pay', 'OT 1.5 เท่า'], ['overtime_3_pay', 'OT 3.0 เท่า'], ['meal_pay', 'ค่าอาหาร'], ['shift_pay', 'ค่ากะ'], ['gross_pay', 'รายได้รวมสะสม']].map(([key, label]) => <div key={key} className="rounded-2xl border border-slate-200 bg-white p-6"><dt className="text-slate-600">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{money(data.row[key])} บาท</dd></div>)}
             </dl>
         </>}
     </section>;

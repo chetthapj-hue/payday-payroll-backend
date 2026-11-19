@@ -5,6 +5,14 @@ const base=process.env.PAYDAY_TEST_BASE_URL || 'http://127.0.0.1:5174';
 assert.ok(process.env.PAYDAY_TEST_ADMIN_PASSWORD,'Use the isolated browser runner');
 const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 const errors=[];
+async function assertCurrentOtUi(page, history=false) {
+ if(history) await page.getByRole('columnheader',{name:'OT รวม (ชั่วโมง)',exact:true}).waitFor();
+ else await page.getByText('ชั่วโมง OT 1.5 เท่า',{exact:true}).first().waitFor();
+ const labels=await page.locator('th, dt, label, option').allTextContents();
+ assert.ok(labels.every(label=>!/OT [12] เท่า/.test(label)),'No unsupported OT column, summary card, input or option');
+ if(history) assert.deepEqual((await page.getByRole('columnheader').allTextContents()).filter(label=>label.startsWith('OT ')),['OT รวม (ชั่วโมง)','OT 1.5 เท่า (ชั่วโมง)','OT 3.0 เท่า (ชั่วโมง)']);
+}
+
 async function pageFor(){const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));return page;}
 async function login(page,login,password,role){
  await page.goto(base);
@@ -43,6 +51,7 @@ try {
  await user.getByRole('heading',{name:'ข้อมูลของฉัน',exact:true}).waitFor();
  await user.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
  await user.getByLabel('เดือนที่ทำงาน',{exact:true}).fill(date.slice(0,7));
+ await assertCurrentOtUi(user,true);
  await user.getByRole('button',{name:'แก้ไข OT',exact:true}).click();
  assert.deepEqual(await user.getByLabel('อัตรา OT',{exact:true}).locator('option').allTextContents(),['1.5 เท่า','3.0 เท่า']);
  await user.getByLabel('OT รวม',{exact:true}).fill('1.5');await user.getByLabel('อัตรา OT',{exact:true}).selectOption('3');
@@ -70,7 +79,60 @@ try {
  await user.getByRole('button',{name:'แก้ไขวันลา',exact:true}).click();
  await user.getByRole('button',{name:'ยกเลิกวันลา',exact:true}).click();
  await user.getByRole('cell',{name:'ลาป่วย (ไม่ได้เงิน)',exact:true}).waitFor({state:'detached'});
+ // Check the administrator's actual history and creation form too.
+ await admin.getByRole('button',{name:'บันทึกการทำงาน',exact:true}).click();
+ await admin.getByLabel('พนักงานสำหรับค้นประวัติ',{exact:true}).selectOption(String(employee.id));
+ await admin.getByLabel('เดือนประวัติ',{exact:true}).fill('2025-06');
+ await admin.getByRole('button',{name:'ค้นประวัติ',exact:true}).click();
+ await admin.getByRole('button',{name:'แก้ไข OT',exact:true}).waitFor();
+ await assertCurrentOtUi(admin,true);
+ await admin.screenshot({path:'/tmp/payday-browser/ot-history-admin.png',fullPage:true});
+ await user.screenshot({path:'/tmp/payday-browser/ot-history-employee.png',fullPage:true});
+ await user.getByRole('button',{name:'รายได้สะสมของฉัน',exact:true}).click();
+ await user.getByLabel('เดือนจ่ายสำหรับยอดสะสม',{exact:true}).fill('2025-06');
+ await user.getByRole('region',{name:'รายได้สะสมของฉัน',exact:true}).getByText('งวดจ่าย',{exact:false}).first().waitFor();
+ await assertCurrentOtUi(user);
+ // Seed exactly one legacy row only in the verified isolated test DB. Never use application writes to bypass the rate policy.
+ assert.ok(process.env.TEST_DATABASE_URL);
+ const dbName=decodeURIComponent(new URL(process.env.TEST_DATABASE_URL).pathname.slice(1));
+ assert.match(dbName,/^payday[a-z0-9_]*_test[a-z0-9_]*$/);assert.equal(info.database,dbName);
+ const {default:pg}=await import('pg');const db=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL});
+ try {
+  assert.equal((await db.query('SELECT current_database() AS name')).rows[0].name,dbName);
+  const legacy=(await db.query(`INSERT INTO work_logs(employee_id,work_date,regular_minutes,overtime_minutes,overtime_2x_minutes,overtime_3x_minutes,shift_type,meal_allowance)
+   VALUES($1,'2025-06-04',480,60,60,0,'day',166) RETURNING *`,[employee.id])).rows[0];
+  await user.getByRole('button',{name:'ประวัติการทำงาน',exact:true}).click();
+  await user.getByText('พบข้อมูล OT อัตราเดิมอื่น 1 รายการทำงาน',{exact:false}).waitFor();
+  await assertCurrentOtUi(user,true);
+  await user.getByRole('button',{name:'รายได้สะสมของฉัน',exact:true}).click();
+  await user.getByLabel('เดือนจ่ายสำหรับยอดสะสม',{exact:true}).fill('2025-07');
+  await user.getByText('พบข้อมูล OT อัตราเดิมอื่น 1 รายการพนักงาน',{exact:false}).waitFor();
+  await assertCurrentOtUi(user);
+  await admin.getByRole('button',{name:'ค้นประวัติ',exact:true}).click();
+  await admin.getByText('พบข้อมูล OT อัตราเดิมอื่น 1 รายการทำงาน',{exact:false}).waitFor();
+  await assertCurrentOtUi(admin,true);
+  await admin.getByRole('button',{name:'คำนวณเงินเดือน',exact:true}).click();
+  await admin.getByLabel('เดือนจ่าย (จ่ายวันที่ 25)').fill('2025-07');
+  await admin.getByRole('button',{name:'คำนวณ / เปิดงวด',exact:true}).click();
+  await admin.getByRole('button',{name:'ตรวจยอดแล้ว — บันทึกงวดนี้',exact:false}).waitFor();
+  await assertCurrentOtUi(admin);
+  const preview=await api(admin,'/payroll/preview?month=2025-07',undefined,'GET');
+  const saved=await api(admin,'/payroll/save',{month:'2025-07',preview_token:preview.preview_token});
+  const frozen=await api(admin,`/payroll/periods/${saved.period.id}/publish`,{});
+  const originalItems=(await db.query('SELECT * FROM payroll_items WHERE payroll_period_id=$1 ORDER BY id',[saved.period.id])).rows;
+  await admin.getByRole('button',{name:'รายงานที่บันทึก',exact:true}).click();
+  await admin.getByLabel('งวดที่บันทึกแล้ว').selectOption(String(saved.period.id));
+  await admin.getByRole('heading',{name:/รายงานที่บันทึกแล้ว/}).waitFor();
+  await assertCurrentOtUi(admin);
+  await user.getByRole('button',{name:'เงินเดือนของฉัน',exact:true}).click();
+  await user.getByLabel('งวดเงินเดือนของฉัน',{exact:true}).selectOption(String(saved.period.id));
+  await user.getByRole('heading',{name:/เงินเดือนงวดจ่าย/}).waitFor();
+  await assertCurrentOtUi(user);
+  assert.deepEqual(await api(admin,`/payroll/periods/${saved.period.id}`,undefined,'GET'),frozen);
+  assert.deepEqual((await db.query('SELECT * FROM payroll_items WHERE payroll_period_id=$1 ORDER BY id',[saved.period.id])).rows,originalItems);
+  assert.deepEqual((await db.query('SELECT * FROM work_logs WHERE id=$1',[legacy.id])).rows[0],legacy);
+ } finally {await db.end();}
  assert.deepEqual(errors,[]);
  await user.screenshot({path:'/tmp/payday-browser/attendance.png',fullPage:true});
- console.log('PASS attendance browser: built Express app, employment setup, edit OT in hours/meal refresh, paid and unpaid leave, history and cancellation');
+ console.log('PASS attendance browser: built Express app, employment setup, edit OT in hours/meal refresh, paid and unpaid leave, both-role history/metrics without OT 1/2, legacy warning and unchanged source/snapshot');
 } finally {await browser.close();}

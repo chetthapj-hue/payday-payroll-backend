@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isWeekend, workTimePayload, metricValue, payMonthForWorkDate, overtimeForm, overtimePayload } from '../../frontend/src/api.js';
+import { isWeekend, workTimePayload, metricValue, payMonthForWorkDate, overtimeForm, overtimePayload, payrollMetrics, workLogOvertime15Minutes, legacyOvertimeSummary } from '../../frontend/src/api.js';
 
 test('weekend forms submit selected multiplier and reset to normal on weekdays', () => {
  const form={work_date:'2025-10-18',shift_type:'day',wage_multiplier:'2',overtime_hours:'2',overtime_3x_hours:'0.5'};
@@ -56,4 +56,23 @@ test('frontend rejects unsupported OT rates and refuses to convert legacy 1/2 co
  }
  const legacy=overtimeForm({overtime_minutes:60,overtime_1x_minutes:0,overtime_2x_minutes:60,overtime_3x_minutes:0});
  assert.throws(()=>overtimePayload(legacy),/ตรวจทาน/);
+});
+
+
+test('current payroll metrics expose only supported OT columns and cards',()=>{
+ assert.ok(payrollMetrics.some(([key])=>key==='overtime_15_minutes'));
+ assert.ok(payrollMetrics.some(([key])=>key==='overtime_3_minutes'));
+ assert.ok(payrollMetrics.every(([key,title])=>!/^overtime_[12]_(minutes|pay)$/.test(key) && !/OT [12] เท่า/.test(title)));
+});
+
+test('legacy OT remains accounted for and flagged instead of being relabeled as 1.5',()=>{
+ const valid={overtime_minutes:90,overtime_3x_minutes:30,overtime_1x_minutes:0,overtime_2x_minutes:0};
+ assert.equal(workLogOvertime15Minutes(valid),60);
+ assert.deepEqual(legacyOvertimeSummary([valid],true),{count:0,minutes:0,pay:0});
+ const legacy={...valid,overtime_1x_minutes:15,overtime_2x_minutes:15};
+ assert.equal(workLogOvertime15Minutes(legacy),30);
+ assert.deepEqual(legacyOvertimeSummary([valid,legacy],true),{count:1,minutes:30,pay:0});
+ assert.deepEqual(legacyOvertimeSummary([{overtime_1_minutes:15,overtime_2_minutes:15,overtime_1_pay:'12.50',overtime_2_pay:'25.00'}]),{count:1,minutes:30,pay:37.5});
+ assert.deepEqual(legacyOvertimeSummary([{overtime_total_minutes:90,overtime_15_minutes:30,overtime_3_minutes:30}]),{count:1,minutes:30,pay:0});
+ assert.deepEqual(legacyOvertimeSummary([{overtime_total_minutes:null,overtime_15_minutes:null,overtime_3_minutes:null}]),{count:0,minutes:0,pay:0});
 });

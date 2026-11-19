@@ -143,3 +143,19 @@ node server/check-legacy-overtime.js
 แสดงเฉพาะ legacy_rows ไม่เขียนข้อมูล งานนี้ตรวจเฉพาะฐานทดสอบ ไม่ได้เชื่อม production จึงยังยืนยันจำนวน legacy ในฐานจริงไม่ได้
 
 ผลตรวจงานจำกัดอัตรา OT: Node tests ผ่าน 65 รายการ, lint/build/check:git ผ่าน และ Chrome ทั้ง 5 ชุดผ่าน ฐาน local ตาม server/.env ตรวจแบบ SELECT อ่านอย่างเดียวได้ legacy_rows=0; ไม่ได้เชื่อม production จึงไม่สรุปว่าฐานจริงไม่มี legacy ไม่ได้ commit/push หรือแก้ production
+
+## หน้าปัจจุบันแสดงเฉพาะ OT 1.5 / 3.0
+
+ตรวจ source ที่ใช้ deploy แล้ว: root build เรียก frontend/ และ Express อ่าน frontend/dist ใน repo นี้ ไม่ใช้ repo frontend ภายนอก Local main และ remote main ที่ตรวจในงานนี้อยู่ที่ 976d0979def3d82be652aa6256a06ac3a7877778 ซึ่งยังมีหัว OT 1/2 ใน source จึงแก้ส่วนแสดงผลที่ตกค้าง ไม่ได้สรุปว่าปัญหาเกิดจาก cache หรือ Render deploy ล้าหลัง เพราะยังไม่มี production URL/Live commit ให้ตรวจโดยตรง
+
+ประวัติ admin/employee เหลือ OT รวม, OT 1.5 และ OT 3.0 เท่านั้น ลบ metrics/card OT 1/2 จากรายได้สะสม คำนวณเงินเดือน และหน้ารายงาน รวมถึงข้อมูลในฟอร์มแก้ไข/ยืนยันวันลา คงค่าจ้างปกติและ policy ค่าอาหาร 30 นาที/ฐาน OT เดิมไว้
+
+หากพบอัตราเดิมอื่น แสดง LegacyOvertimeNotice พร้อมจำนวนรายการ ชั่วโมง และยอดเงินเท่าที่ข้อมูลมี ไม่ย้ายชั่วโมงเก่าไปเป็น 1.5 ไม่ลบคอลัมน์ฐานข้อมูล และไม่เปลี่ยน snapshot ยอด OT รวมอาจรวมอัตราเดิมที่ไม่ได้แสดงเป็นคอลัมน์ ต้องตรวจทานก่อนจัดการ สคริปต์ check-legacy-overtime.js อ่านจำนวน/นาทีทั้ง work_logs และ payroll_items พร้อมยอด OT อัตราเดิมใน snapshot แบบ SELECT เท่านั้น ฐาน local ที่ตรวจพบ legacy_rows=0 และ legacy_saved_items=0 แต่ยังไม่ได้ตรวจ production
+
+ทดสอบ Node 67 รายการผ่าน มี browser assertions ตรวจหัวตารางตรงสามคอลัมน์ และห้าม OT 1/2 ใน header/card/input/option ทุกหน้าที่เกี่ยวข้องทั้งสองบทบาท ทดสอบ legacy fixture เฉพาะฐาน payday*_test* และเปรียบเทียบต้นทาง/snapshot ก่อน-หลัง ภาพทดสอบอยู่ /tmp/payday-browser/ot-history-admin.png และ ot-history-employee.png
+
+ไม่มี migration ใหม่สำหรับงานแก้หน้าจอนี้ ยังไม่ commit/push/deploy หรือเขียน production
+
+ผลตรวจสุดท้ายของงานแก้ส่วนแสดงผล: lint/build/check:git ผ่าน, Node tests 67 รายการผ่าน, Chrome ทั้ง 5 ชุดผ่านบน Express production build ที่ใช้ฐานทดสอบ รวมการยืนยันหัว OT สามคอลัมน์ทั้งสองบทบาท การ์ดรายได้สะสม/รายงาน และ legacy warning โดยไม่เปลี่ยนข้อมูลต้นทางหรือ snapshot ปรับ browser tests ให้รอข้อมูลประวัติโหลดก่อนตรวจแถว เพื่อรองรับการรีเฟรชเมื่อกลับเข้าหน้า
+
+อัปเดตตรวจ production แบบอ่านอย่างเดียวหลังได้รับ URL https://payday-payroll-backend.onrender.com: หน้าแรกและ /api/health ตอบ 200 โดย health.status=ok หน้าแรกโหลด /assets/index-DdYMappn.js ซึ่งเทียบ bytes แล้วตรงกับ frontend build จาก 976d097 ทุกไบต์ และใน asset ยังมีหัว OT 1 เท่า/2 เท่า รุ่นแก้หน้าประวัติใน working tree ยังไม่ได้ commit/push/deploy จึงยังไม่ใช่ asset ที่ production เสิร์ฟ ผลนี้ยืนยันไฟล์ frontend ที่ใช้งานจริง ส่วน /api/health ยังไม่เปิดเผย SHA ของ Live backend commit ไม่มีการล็อกอิน ส่งคำขอเขียน หรือแก้ฐาน production

@@ -92,12 +92,8 @@ export const payrollMetrics = [
     ['sick_days', 'วันลาป่วย', 'days'],
     ['personal_days', 'วันลากิจ', 'days'],
     ['overtime_total_minutes', 'ชั่วโมง OT รวม', 'hours'],
-    ['overtime_1_minutes', 'ชั่วโมง OT 1 เท่า', 'hours'],
-    ['overtime_2_minutes', 'ชั่วโมง OT 2 เท่า', 'hours'],
-    ['overtime_1_pay', 'เงิน OT 1 เท่า', 'money'],
-    ['overtime_2_pay', 'เงิน OT 2 เท่า', 'money'],
     ['overtime_15_minutes', 'ชั่วโมง OT 1.5 เท่า', 'hours'],
-    ['overtime_3_minutes', 'ชั่วโมง OT 3 เท่า', 'hours'],
+    ['overtime_3_minutes', 'ชั่วโมง OT 3.0 เท่า', 'hours'],
     ['overtime_total_pay', 'เงิน OT รวม', 'money'],
 ];
 export function metricValue(value, type) {
@@ -108,3 +104,21 @@ export function metricValue(value, type) {
 }
 
 export const attendanceLabel = log => log.attendance_status === 'sick' ? `ลาป่วย (${log.leave_paid ? 'ได้เงิน' : 'ไม่ได้เงิน'})` : log.attendance_status === 'personal' ? `ลากิจ (${log.leave_paid ? 'ได้เงิน' : 'ไม่ได้เงิน'})` : log.source === 'auto' ? 'ทำงาน (อัตโนมัติ)' : 'ทำงาน';
+
+
+// Keep legacy amounts readable without relabeling their hours as 1.5x.
+export function workLogOvertime15Minutes(log) {
+    return log.overtime_minutes - (log.overtime_3x_minutes ?? 0) - (log.overtime_1x_minutes ?? 0) - (log.overtime_2x_minutes ?? 0);
+}
+export function legacyOvertimeSummary(rows, workLogs = false) {
+    return rows.reduce((summary, row) => {
+        const direct = workLogs ? Number(row.overtime_1x_minutes ?? 0) + Number(row.overtime_2x_minutes ?? 0)
+            : Number(row.overtime_1_minutes ?? 0) + Number(row.overtime_2_minutes ?? 0);
+        const difference = !workLogs && [row.overtime_total_minutes, row.overtime_15_minutes, row.overtime_3_minutes].every(v => v != null)
+            ? Math.max(0, Number(row.overtime_total_minutes) - Number(row.overtime_15_minutes) - Number(row.overtime_3_minutes)) : 0;
+        const minutes = Math.max(direct, difference);
+        const pay = Number(row.overtime_1_pay ?? 0) + Number(row.overtime_2_pay ?? 0);
+        if (minutes > 0 || pay > 0) { summary.count++; summary.minutes += minutes; summary.pay += pay; }
+        return summary;
+    }, { count: 0, minutes: 0, pay: 0 });
+}

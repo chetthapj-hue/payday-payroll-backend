@@ -70,7 +70,7 @@ try {
    const row=page.locator('tbody tr').filter({hasText:'1 กุมภาพันธ์ 2568'});await row.waitFor();
    assert.equal(await row.locator('td').nth(4).innerText(),'8 ชม.');
    assert.equal(await row.locator('td').nth(5).innerText(),'2 ชม.');
-   assert.equal(await row.locator('td').nth(9).innerText(),'2 ชม.');
+   assert.equal(await row.locator('td').nth(7).innerText(),'2 ชม.');
   }
   users.push({code,temp,password,page,expected});
  }
